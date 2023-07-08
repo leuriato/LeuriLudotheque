@@ -1,0 +1,18 @@
+[package]
+name = "ludotheque"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+gtk = { git = "https://github.com/gtk-rs/gtk3-rs.git" }
+config = "0.13"
+dirs = "3.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0"
+xdg = "^2.1"
+igdb = "0.1.2"
+async-std = "1.12.0"
+reqwest = "0.11.18"
+enum_dispatch = "0.3.12"
