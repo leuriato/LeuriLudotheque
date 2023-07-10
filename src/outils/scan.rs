@@ -2,6 +2,18 @@ use std::path::Path;
 use igdb::model::games::Game;
 use crate::donnees::config;
 
+use crate::api::igdb::err::*;
+use crate::chemin::{json, chemins};
+use crate::interne::erreurs::TraitErreur;
+
+use async_std::task;
+use gtk::gdk::keys::constants::w;
+use igdb::client::IGDBClient;
+use igdb::media_quality::MediaQuality;
+use serde::{Serialize, Deserialize};
+use std::path::PathBuf;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
 #[derive(Debug, Clone)]
 pub struct Jeu {
     pub igdb_id: Option<String>,
@@ -58,7 +70,7 @@ fn fini_par(chemin: String, ext: String) -> bool {
 }
 
 
-pub fn trouver_jeux() -> Vec<Jeu> {
+pub fn trouver_jeux() -> Vec<PathBuf> {
     let config = config::obtenir_config();
 
     let ext = extensions_valables(&config);
@@ -70,7 +82,7 @@ pub fn trouver_jeux() -> Vec<Jeu> {
 
     let mut queue: Vec<String> = enfants(dossier);
 
-    let mut jeux: Vec<Jeu> = vec![];
+    let mut jeux: Vec<PathBuf> = vec![];
 
     while queue.len() > 0 {
         let chemin: String = match queue.pop() {
@@ -83,14 +95,7 @@ pub fn trouver_jeux() -> Vec<Jeu> {
         } else {
             for extension in &ext {
                 if fini_par(chemin.clone(), format!(".{}", extension)) {
-                    jeux.append(
-                         &mut vec![Jeu {
-                            igdb_id: None,
-                            igdb_jeu: None,
-                            chemin: Some(chemin.clone()),
-                            image: None,
-                        }
-                    ]);
+                    jeux.push(PathBuf::from(chemin.clone()));
                 }
             }
         }
@@ -98,30 +103,19 @@ pub fn trouver_jeux() -> Vec<Jeu> {
 
     jeux
 }
+/*
+pub fn identifier_jeu(chemin: PathBuf) -> Result<Jeu, Erreur> {
+    let nom: String = match chemin.as_path().file_prefix() {
+        Some(os_valeur) => match os_valeur.to_str() {
+            Some(valeur) => Valeur,
+            None => return Err(...),
+        },
+        None => return Err(...),
+    };
 
-pub fn scanner_jeux() {
+    task::block_on(async {
+        let igdb_client = obtenir_igdb_client()?;
+        let games_client = igdb_client.games();
+        let jeu_igdb = games_client.get_first_by_name(&nom).await;
 
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+*/

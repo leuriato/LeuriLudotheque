@@ -1,13 +1,14 @@
 pub mod err;
+pub mod requete;
+pub mod objet;
 
 use crate::api::igdb::err::*;
+use crate::api::igdb::requete::*;
 use crate::chemin::{json, chemins};
 use crate::interne::erreurs::TraitErreur;
 
 use async_std::task;
-use gtk::gdk::keys::constants::w;
-use igdb::client::IGDBClient;
-use igdb::media_quality::MediaQuality;
+use serde::de::DeserializeOwned;
 use serde::{Serialize, Deserialize};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -57,7 +58,7 @@ fn obtenir_client() -> Result<Client, Erreur> {
             }.as_err(),
         Err(json::err::Erreur::ChargementImpossible(erreur)) => {
             println!("INFO: Client IGDB manquant; création d'un modèle à remplir.");
-            enregistrer_client(client_modele());
+            let _ = enregistrer_client(client_modele());
             ErreurClientInaccessible {
                 erreur: json::err::Erreur::ChargementImpossible(erreur),
             }.as_err()
@@ -174,56 +175,64 @@ fn obtenir_token() -> Result<Token, Erreur> {
     }
 }
 
-pub fn obtenir_igdb_client() -> Result<IGDBClient, Erreur> {
-    let client_id = obtenir_client()?.client_id;
-    let access_token = obtenir_token()?.access_token;
-    println!(
-        "DEBUG: Création d'un client IGDB avec id: {}, token: {}.",
-        client_id,
-        access_token
-    );
-    Ok(IGDBClient::new(client_id, access_token))
+pub struct ClientIGDB {
+    client_id: String,
+    access_token: String,
 }
 
-pub fn screenshots() {
-    task::block_on(async {
-        let igdb_client = obtenir_igdb_client().unwrap();
-        let games_client = igdb_client.games();
-        let witcher = games_client.get_first_by_name("Witcher 3").await;
+impl ClientIGDB {
+    pub fn new() -> Result<ClientIGDB, Erreur> {
+        let client_id = obtenir_client()?.client_id;
+        let access_token = obtenir_token()?.access_token;
+        Ok(ClientIGDB { client_id, access_token })
+    }
 
-        println!("{:?}",&witcher);
-        return;/*
-        //Get the first 3 covers for the Witcher 3 game
-        let covers_client = igdb_client.covers();
-        let covers_response = covers_client.get_by_game_id(witcher.id, 3).await.unwrap();
+    pub fn demander(&self, endpoint: String, corps: String) -> Result<String, Erreur> {
+        task::block_on(async {
+            let url = format!("https://api.igdb.com/v4/{}", endpoint);
 
-        //Get the first 3 screenshots for the Witcher 3 game
-        let screenshots_client = igdb_client.screenshots();
-        let screenshots_response = screenshots_client
-           .get_by_game_id(witcher.id, 3)
-           .await
-           .unwrap();
+            let client = reqwest::Client::new();
 
-       for (i, cover) in covers_response.iter().enumerate() {
-           covers_client
-               .download_by_id(
-                   cover.id,
-                   format!("cover{}.jpg", i),
-                   MediaQuality::ScreenshotHuge,
-               )
-               .await
-               .unwrap();
-       }
+            let client_id = match reqwest::header::HeaderValue::from_str(self.client_id.as_str()) {
+                Ok(valeur) => valeur,
+                Err(erreur) => return ErreurConstructionRequete { erreur }.as_err(),
+            };
+            let access_token = match reqwest::header::HeaderValue::from_str(format!("Bearer {}", self.access_token).as_str()) {
+                Ok(valeur) => valeur,
+                Err(erreur) => return ErreurConstructionRequete { erreur }.as_err(),
+            };
 
-       for (i, screenshot) in screenshots_response.iter().enumerate() {
-           screenshots_client
-               .download_by_id(
-                   screenshot.id,
-                   format!("screenshot{}.jpg", i),
-                   MediaQuality::CoverBig,
-               )
-               .await
-               .unwrap();
-       }*/
-   });
+            let mut entete = reqwest::header::HeaderMap::new();
+            entete.insert("Client-ID", client_id);
+            entete.insert("Authorization", access_token);
+            entete.insert("Accept", reqwest::header::HeaderValue::from_static("application/json"));
+
+            let reponse = match client
+                .post(url)
+                .headers(entete)
+                .body(corps)
+                .send()
+                .await {
+                Ok(resultat) => resultat.text().await,
+                Err(erreur) => return ErreurDemandeRequete { erreur }.as_err(),
+            };
+
+            match reponse {
+                Ok(valeur) => Ok(valeur),
+                Err(erreur) => ErreurDemandeRequete { erreur }.as_err(),
+            }
+        })
+    }
+
+    pub fn solliciter<T: DeserializeOwned>(&self, requete: Requete<T>) -> Result<T, Erreur> {
+        let reponse = self.demander(requete.endpoint, requete.corps)?;
+
+        let resultat: T = match serde_json::from_str(&reponse) {
+            Ok(valeur) => valeur,
+            Err(erreur) => return ErreurTraitementRequete { erreur, reponse }.as_err(),
+        };
+
+        Ok(resultat)
+    }
 }
+

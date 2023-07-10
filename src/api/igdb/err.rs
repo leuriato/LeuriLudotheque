@@ -106,6 +106,71 @@ impl TraitErreur for ErreurEnregistrementExpire {
     }
 }
 
+// Erreur ConstructionRequete
+pub struct ErreurConstructionRequete {
+    pub erreur: reqwest::header::InvalidHeaderValue,
+}
+
+impl ErreurConstructionRequete {
+    pub fn as_err<T>(self) -> Result<T, Erreur> {
+        Err(Erreur::ErreurConstructionRequete(self))
+    }
+}
+
+impl TraitErreur for ErreurConstructionRequete {
+    fn message(&self) -> String {
+        format!("Impossible de contruire la requête IGDB.")
+    }
+
+    fn cause(&self) -> Option<String> {
+        Some(format!("{}", self.erreur))
+    }
+}
+
+// Erreur DemandeRequete
+pub struct ErreurDemandeRequete {
+    pub erreur: reqwest::Error,
+}
+
+impl ErreurDemandeRequete {
+    pub fn as_err<T>(self) -> Result<T, Erreur> {
+        Err(Erreur::ErreurDemandeRequete(self))
+    }
+}
+
+impl TraitErreur for ErreurDemandeRequete {
+    fn message(&self) -> String {
+        format!("La requete IGDB a échoué.")
+    }
+
+    fn cause(&self) -> Option<String> {
+        Some(format!("{}", self.erreur))
+    }
+}
+
+// Erreur TraitementRequete
+pub struct ErreurTraitementRequete {
+    pub erreur: serde_json::Error,
+    pub reponse: String,
+}
+
+impl ErreurTraitementRequete {
+    pub fn as_err<T>(self) -> Result<T, Erreur> {
+        Err(Erreur::ErreurTraitementRequete(self))
+    }
+}
+
+impl TraitErreur for ErreurTraitementRequete {
+    fn message(&self) -> String {
+        format!("Le traitement de la requête IGDB a échoué.\nRéponse: {}", self.reponse)
+    }
+
+    fn cause(&self) -> Option<String> {
+        Some(format!("{}", self.erreur))
+    }
+}
+
+
 // Enum Erreur
 pub enum Erreur{
     ClientInaccessible(ErreurClientInaccessible),
@@ -113,6 +178,9 @@ pub enum Erreur{
     ErreurDemandeToken(ErreurDemandeToken),
     ErreurRecuperationToken(ErreurRecuperationToken),
     ErreurEnregistrementExpire(ErreurEnregistrementExpire),
+    ErreurConstructionRequete(ErreurConstructionRequete),
+    ErreurDemandeRequete(ErreurDemandeRequete),
+    ErreurTraitementRequete(ErreurTraitementRequete),
 }
 
 impl Erreur {
@@ -123,6 +191,9 @@ impl Erreur {
             Erreur::ErreurDemandeToken(erreur) => erreur,
             Erreur::ErreurRecuperationToken(erreur) => erreur,
             Erreur::ErreurEnregistrementExpire(erreur) => erreur,
+            Erreur::ErreurConstructionRequete(erreur) => erreur,
+            Erreur::ErreurDemandeRequete(erreur) => erreur,
+            Erreur::ErreurTraitementRequete(erreur) => erreur,
         }
     }
 }
