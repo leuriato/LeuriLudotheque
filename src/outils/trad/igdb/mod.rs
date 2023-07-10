@@ -7,8 +7,8 @@ use crate::api::igdb::objet::*;
 use serde::Serialize;
 
 pub trait Traduisible where Self: Clone + Serialize {
-    fn pre_prompt(&self) -> &'static str {
-        ""
+    fn pre_prompt(&self) -> String {
+        format!("")
     }
 
     fn preparer_traduction(&self) -> Self;
@@ -29,14 +29,14 @@ pub trait Traduisible where Self: Clone + Serialize {
 }
 
 impl Traduisible for JeuIGDB {
-    fn pre_prompt(&self) -> &'static str {
+    fn pre_prompt(&self) -> String {
         let config = obtenir_config();
 
         format!(
             "Translate this game into {} (the name of the game should be the {} title when provided) and delete \"alternative_names\"",
             config.langue,
             config.langue,
-        ).as_str()
+        )
     }
 
     fn preparer_traduction(&self) -> Self {
@@ -196,8 +196,10 @@ impl Traduisible for MotCleIGDB {
 }
 
 impl Traduisible for EntrepriseIGDB {
-    fn pre_prompt(&self) -> &'static str {
-        "Translate this entreprise in french"
+    fn pre_prompt(&self) -> String {
+        let config = obtenir_config();
+
+        format!("Translate this entreprise in {}", config.langue)
     }
 
     fn preparer_traduction(&self) -> Self {
