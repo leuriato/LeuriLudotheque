@@ -1,26 +1,7 @@
 use std::path::Path;
-use igdb::model::games::Game;
 use crate::donnees::config;
 
-use crate::api::igdb::err::*;
-use crate::chemin::{json, chemins};
-use crate::interne::erreurs::TraitErreur;
-
-use async_std::task;
-use gtk::gdk::keys::constants::w;
-use igdb::client::IGDBClient;
-use igdb::media_quality::MediaQuality;
-use serde::{Serialize, Deserialize};
 use std::path::PathBuf;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-
-#[derive(Debug, Clone)]
-pub struct Jeu {
-    pub igdb_id: Option<String>,
-    pub igdb_jeu: Option<igdb::model::games::Game>,
-    pub chemin: Option<String>,
-    pub image: Option<String>,
-}
 
 fn extensions_valables(config: &config::LudothequeConfig) -> Vec<String> {
     let mut ext: Vec<String> = vec![];

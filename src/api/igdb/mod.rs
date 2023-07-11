@@ -90,32 +90,30 @@ fn determiner_expire(token: &Token) -> Expire {
     }
 }
 
-fn demander_token() -> Result<String, Erreur> {
-    task::block_on(async {
-        let client: Client = obtenir_client()?;
+async fn demander_token() -> Result<String, Erreur> {
+    let client: Client = obtenir_client()?;
 
-        let url = format!(
-            "https://id.twitch.tv/oauth2/token?client_id={}&client_secret={}&grant_type=client_credentials",
-            client.client_id,
-            client.client_secret,
-        );
+    let url = format!(
+        "https://id.twitch.tv/oauth2/token?client_id={}&client_secret={}&grant_type=client_credentials",
+        client.client_id,
+        client.client_secret,
+    );
 
-        let webclient = reqwest::Client::new();
+    let webclient = reqwest::Client::new();
 
-        let reponse = match webclient.post(url).send().await {
-            Ok(resultat) => resultat.text().await,
-            Err(erreur) => return ErreurDemandeToken { erreur }.as_err(),
-        };
+    let reponse = match webclient.post(url).send().await {
+        Ok(resultat) => resultat.text().await,
+        Err(erreur) => return ErreurDemandeToken { erreur }.as_err(),
+    };
 
-        match reponse {
-            Ok(valeur) => Ok(valeur),
-            Err(erreur) => ErreurDemandeToken { erreur }.as_err(),
-        }
-    })
+    match reponse {
+        Ok(valeur) => Ok(valeur),
+        Err(erreur) => ErreurDemandeToken { erreur }.as_err(),
+    }
 }
 
-fn recuperer_token() -> Result<Token, Erreur> {
-    let text = match demander_token() {
+async fn recuperer_token() -> Result<Token, Erreur> {
+    let text = match demander_token().await {
         Ok(valeur) => valeur,
         Err(erreur) => return Err(erreur),
     };
@@ -164,14 +162,14 @@ fn verifier_token() -> bool {
     }
 }
 
-fn obtenir_token() -> Result<Token, Erreur> {
+async fn obtenir_token() -> Result<Token, Erreur> {
     if verifier_token() {
         match charger_token() {
             Ok(token) => Ok(token),
-            Err(_) => recuperer_token(),
+            Err(_) => recuperer_token().await,
         }
     } else {
-        recuperer_token()
+        recuperer_token().await
     }
 }
 
@@ -181,51 +179,49 @@ pub struct ClientIGDB {
 }
 
 impl ClientIGDB {
-    pub fn new() -> Result<ClientIGDB, Erreur> {
+    pub async fn new() -> Result<ClientIGDB, Erreur> {
         let client_id = obtenir_client()?.client_id;
-        let access_token = obtenir_token()?.access_token;
+        let access_token = obtenir_token().await?.access_token;
         Ok(ClientIGDB { client_id, access_token })
     }
 
-    pub fn demander(&self, endpoint: String, corps: String) -> Result<String, Erreur> {
-        task::block_on(async {
-            let url = format!("https://api.igdb.com/v4/{}", endpoint);
+    pub async fn demander(&self, endpoint: String, corps: String) -> Result<String, Erreur> {
+        let url = format!("https://api.igdb.com/v4/{}", endpoint);
 
-            let client = reqwest::Client::new();
+        let client = reqwest::Client::new();
 
-            let client_id = match reqwest::header::HeaderValue::from_str(self.client_id.as_str()) {
-                Ok(valeur) => valeur,
-                Err(erreur) => return ErreurConstructionRequete { erreur }.as_err(),
-            };
-            let access_token = match reqwest::header::HeaderValue::from_str(format!("Bearer {}", self.access_token).as_str()) {
-                Ok(valeur) => valeur,
-                Err(erreur) => return ErreurConstructionRequete { erreur }.as_err(),
-            };
+        let client_id = match reqwest::header::HeaderValue::from_str(self.client_id.as_str()) {
+            Ok(valeur) => valeur,
+            Err(erreur) => return ErreurConstructionRequete { erreur }.as_err(),
+        };
+        let access_token = match reqwest::header::HeaderValue::from_str(format!("Bearer {}", self.access_token).as_str()) {
+            Ok(valeur) => valeur,
+            Err(erreur) => return ErreurConstructionRequete { erreur }.as_err(),
+        };
 
-            let mut entete = reqwest::header::HeaderMap::new();
-            entete.insert("Client-ID", client_id);
-            entete.insert("Authorization", access_token);
-            entete.insert("Accept", reqwest::header::HeaderValue::from_static("application/json"));
+        let mut entete = reqwest::header::HeaderMap::new();
+        entete.insert("Client-ID", client_id);
+        entete.insert("Authorization", access_token);
+        entete.insert("Accept", reqwest::header::HeaderValue::from_static("application/json"));
 
-            let reponse = match client
-                .post(url)
-                .headers(entete)
-                .body(corps)
-                .send()
-                .await {
-                Ok(resultat) => resultat.text().await,
-                Err(erreur) => return ErreurDemandeRequete { erreur }.as_err(),
-            };
+        let reponse = match client
+            .post(url)
+            .headers(entete)
+            .body(corps)
+            .send()
+            .await {
+            Ok(resultat) => resultat.text().await,
+            Err(erreur) => return ErreurDemandeRequete { erreur }.as_err(),
+        };
 
-            match reponse {
-                Ok(valeur) => Ok(valeur),
-                Err(erreur) => ErreurDemandeRequete { erreur }.as_err(),
-            }
-        })
+        match reponse {
+            Ok(valeur) => Ok(valeur),
+            Err(erreur) => ErreurDemandeRequete { erreur }.as_err(),
+        }
     }
 
-    pub fn solliciter<T: DeserializeOwned>(&self, requete: Requete<T>) -> Result<T, Erreur> {
-        let reponse = self.demander(requete.endpoint, requete.corps)?;
+    pub async fn solliciter<T: DeserializeOwned>(&self, requete: Requete<T>) -> Result<T, Erreur> {
+        let reponse = self.demander(requete.endpoint, requete.corps).await?;
 
         let resultat: T = match serde_json::from_str(&reponse) {
             Ok(valeur) => valeur,
