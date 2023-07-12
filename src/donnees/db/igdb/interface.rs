@@ -5,19 +5,43 @@ use sqlx::Row;
 
 #[async_trait::async_trait]
 pub trait CompatibleSQL: Sized {
+    fn table() -> &'static str;
+
     fn commande_enregistrer(&self) -> String;
-
     fn commande_traduire(&self) -> String;
-
     fn commande_charger(id: u32) -> String;
 
-    fn commande_charger_traduit(id: u32) -> String;
+    async fn existe(id: u32) -> Result<bool, Erreur> {
+        match sqlx::query(
+            &format!("SELECT * FROM {} WHERE \"jeu\" = {};", Self::table(), id)
+        ).fetch_optional(&obtenir_db().await?).await {
+            Ok(valeur) => Ok(valeur.is_some()),
+            Err(erreur) => ErreurChargementImpossible { erreur, objet: Self::table(), id }.as_err(),
+        }
+    }
+
+    async fn supprimer(id: u32) -> Result<(), Erreur> {
+        match sqlx::query(
+            &format!("DELETE FROM {} WHERE \"jeu\" = {};", Self::table(), id)
+        ).fetch_optional(&obtenir_db().await?).await {
+            Ok(_) => Ok(()),
+            Err(erreur) => ErreurSuppressionImpossible { erreur, objet: Self::table(), id }.as_err(),
+        }
+    }
 
     async fn charger(id: u32) -> Result<Option<Self>, Erreur>;
+    async fn charger_traduit(id: u32) -> Result<Option<Self>, Erreur>;
 }
 
 fn guillemeter(input: String) -> String {
     format!("'{}'", input.replace("'", "\\'"))
+}
+
+fn determiner(val_traduit: Option<String>, val: String) -> String {
+    match val_traduit {
+        Some(valeur) => valeur,
+        None => val,
+    }
 }
 
 trait ValeurSQL {
@@ -160,6 +184,10 @@ async fn charger_vec<T: CompatibleSQL>(
 
 #[async_trait::async_trait]
 impl CompatibleSQL for CollectionIGDB {
+    fn table() -> &'static str {
+        "collections"
+    }
+
     fn commande_enregistrer(&self) -> String {
         format!(
             r#"
@@ -193,16 +221,6 @@ impl CompatibleSQL for CollectionIGDB {
         )
     }
 
-    fn commande_charger_traduit(id: u32) -> String {
-        format!(
-            r#"
-            SELECT (id, COALESCE(name_traduit, name) AS name, slug, updated_at)
-            FROM collections WHERE "id" = {}
-            "#,
-            id.convertir(),
-        )
-    }
-
     async fn charger(id: u32) -> Result<Option<CollectionIGDB>, Erreur> {
         match sqlx::query_as::<_, CollectionIGDB>(
             &CollectionIGDB::commande_charger(id)
@@ -211,10 +229,30 @@ impl CompatibleSQL for CollectionIGDB {
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "collection", id }.as_err(),
         }
     }
+
+    async fn charger_traduit(id: u32) -> Result<Option<CollectionIGDB>, Erreur> {
+        match CollectionIGDB::charger(id).await? {
+            Some(valeur) => Ok(Some(
+                CollectionIGDB {
+                    id,
+                    name: determiner(valeur.name_traduit, valeur.name),
+                    name_traduit: None,
+                    slug: valeur.slug,
+
+                    updated_at: valeur.updated_at,
+                }
+            )),
+            None => Ok(None),
+        }
+    }
 }
 
 #[async_trait::async_trait]
 impl CompatibleSQL for FranchiseIGDB {
+    fn table() -> &'static str {
+        "franchises"
+    }
+
     fn commande_enregistrer(&self) -> String {
         format!(
             r#"
@@ -248,16 +286,6 @@ impl CompatibleSQL for FranchiseIGDB {
         )
     }
 
-    fn commande_charger_traduit(id: u32) -> String {
-        format!(
-            r#"
-            SELECT (id, COALESCE(name_traduit, name) AS name, slug, updated_at)
-            FROM franchises WHERE "id" = {}
-            "#,
-            id.convertir(),
-        )
-    }
-
     async fn charger(id: u32) -> Result<Option<FranchiseIGDB>, Erreur> {
         match sqlx::query_as::<_, FranchiseIGDB>(
             &FranchiseIGDB::commande_charger(id)
@@ -266,10 +294,30 @@ impl CompatibleSQL for FranchiseIGDB {
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "franchise", id }.as_err(),
         }
     }
+
+    async fn charger_traduit(id: u32) -> Result<Option<FranchiseIGDB>, Erreur> {
+        match FranchiseIGDB::charger(id).await? {
+            Some(valeur) => Ok(Some(
+                FranchiseIGDB {
+                    id,
+                    name: determiner(valeur.name_traduit, valeur.name),
+                    name_traduit: None,
+                    slug: valeur.slug,
+
+                    updated_at: valeur.updated_at,
+                }
+            )),
+            None => Ok(None),
+        }
+    }
 }
 
 #[async_trait::async_trait]
 impl CompatibleSQL for CategorieJeuIGDB {
+    fn table() -> &'static str {
+        "categories_jeu"
+    }
+
     fn commande_enregistrer(&self) -> String {
         println!("ATTENTION: Impossible d'enregistrer une catégorie de jeu.");
         format!("")
@@ -289,16 +337,6 @@ impl CompatibleSQL for CategorieJeuIGDB {
         )
     }
 
-    fn commande_charger_traduit(id: u32) -> String {
-        format!(
-            r#"
-            SELECT (id, COALESCE(name_traduit, name) AS name)
-            FROM categories_jeu WHERE "id" = {}
-            "#,
-            id.convertir(),
-        )
-    }
-
     async fn charger(id: u32) -> Result<Option<CategorieJeuIGDB>, Erreur> {
         match sqlx::query_as::<_, CategorieJeuIGDB>(
             &CategorieJeuIGDB::commande_charger(id)
@@ -307,10 +345,27 @@ impl CompatibleSQL for CategorieJeuIGDB {
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "categorie jeu", id }.as_err(),
         }
     }
+
+    async fn charger_traduit(id: u32) -> Result<Option<CategorieJeuIGDB>, Erreur> {
+        match CategorieJeuIGDB::charger(id).await? {
+            Some(valeur) => Ok(Some(
+                CategorieJeuIGDB {
+                    id,
+                    name: determiner(valeur.name_traduit, valeur.name),
+                    name_traduit: None,
+                }
+            )),
+            None => Ok(None),
+        }
+    }
 }
 
 #[async_trait::async_trait]
 impl CompatibleSQL for CouvertureIGDB {
+    fn table() -> &'static str {
+        "couvertures"
+    }
+
     fn commande_enregistrer(&self) -> String {
         format!(
             r#"
@@ -338,10 +393,6 @@ impl CompatibleSQL for CouvertureIGDB {
         )
     }
 
-    fn commande_charger_traduit(id: u32) -> String {
-        CouvertureIGDB::commande_charger(id)
-    }
-
     async fn charger(id: u32) -> Result<Option<CouvertureIGDB>, Erreur> {
         match sqlx::query_as::<_, CouvertureIGDB>(
             &CouvertureIGDB::commande_charger(id)
@@ -350,10 +401,18 @@ impl CompatibleSQL for CouvertureIGDB {
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "couverture", id }.as_err(),
         }
     }
+
+    async fn charger_traduit(id: u32) -> Result<Option<CouvertureIGDB>, Erreur> {
+        Ok(CouvertureIGDB::charger(id).await?)
+    }
 }
 
 #[async_trait::async_trait]
 impl CompatibleSQL for JeuIGDB {
+    fn table() -> &'static str {
+        "jeux"
+    }
+
     fn commande_enregistrer(&self) -> String {
         format!(
             r#"
@@ -432,35 +491,6 @@ impl CompatibleSQL for JeuIGDB {
         )
     }
 
-    fn commande_charger_traduit(id: u32) -> String {
-        format!(
-            r#"
-            SELECT (
-                id,
-                COALESCE(name_traduit, name) AS name,
-                slug,
-
-                COALESCE(storyline_traduit, storyline) AS storyline,
-                COALESCE(summary_traduit, summary) AS summary,
-
-                first_release_date,
-
-                collection,
-                franchise,
-                category,
-
-                rating,
-                rating_count,
-
-                cover,
-
-                updated_at)
-            FROM jeux WHERE "id" = {}
-            "#,
-            id.convertir(),
-        )
-    }
-
     async fn charger(id: u32) -> Result<Option<JeuIGDB>, Erreur> {
         let db = obtenir_db().await?;
         let resultat = match sqlx::query(
@@ -532,10 +562,61 @@ impl CompatibleSQL for JeuIGDB {
             updated_at: resultat.get("updated_at")
         }))
     }
+
+    async fn charger_traduit(id: u32) -> Result<Option<JeuIGDB>, Erreur> {
+        match JeuIGDB::charger(id).await? {
+            Some(valeur) => Ok(Some(
+                JeuIGDB {
+                    id,
+                    name: determiner(valeur.name_traduit, valeur.name),
+                    name_traduit: None,
+                    slug: valeur.slug,
+
+                    alternative_names: None,
+
+                    summary: Some(determiner(valeur.summary_traduit, valeur.summary.unwrap_or(String::new()))),
+                    summary_traduit: None,
+                    storyline: Some(determiner(valeur.storyline_traduit, valeur.storyline.unwrap_or(String::new()))),
+                    storyline_traduit: None,
+
+                    first_release_date: valeur.first_release_date,
+
+                    collection: valeur.collection,
+                    franchise: valeur.franchise,
+                    category: valeur.category,
+
+                    genres: valeur.genres,
+                    themes: valeur.themes,
+                    keywords: valeur.keywords,
+
+                    platforms: valeur.platforms,
+
+                    remakes: valeur.remakes,
+                    remasters: valeur.remasters,
+                    similar_games: valeur.similar_games,
+
+                    rating: valeur.rating,
+                    rating_count: valeur.rating_count,
+
+                    cover: valeur.cover,
+                    artworks: valeur.artworks,
+                    screenshots: valeur.screenshots,
+                    videos: valeur.videos,
+
+                    updated_at: valeur.updated_at,
+                }
+            )),
+            None => Ok(None),
+        }
+    }
 }
 
 #[async_trait::async_trait]
 impl CompatibleSQL for GenreIGDB {
+    fn table() -> &'static str {
+        "genres"
+    }
+
     fn commande_enregistrer(&self) -> String {
         format!(
             r#"
@@ -569,16 +650,6 @@ impl CompatibleSQL for GenreIGDB {
         )
     }
 
-    fn commande_charger_traduit(id: u32) -> String {
-        format!(
-            r#"
-            SELECT (id, COALESCE(name_traduit, name) AS name, slug, updated_at)
-            FROM genres WHERE "id" = {}
-            "#,
-            id.convertir(),
-        )
-    }
-
     async fn charger(id: u32) -> Result<Option<GenreIGDB>, Erreur> {
         match sqlx::query_as::<_, GenreIGDB>(
             &GenreIGDB::commande_charger(id)
@@ -587,10 +658,30 @@ impl CompatibleSQL for GenreIGDB {
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "genre", id }.as_err(),
         }
     }
+
+    async fn charger_traduit(id: u32) -> Result<Option<GenreIGDB>, Erreur> {
+        match GenreIGDB::charger(id).await? {
+            Some(valeur) => Ok(Some(
+                GenreIGDB {
+                    id,
+                    name: determiner(valeur.name_traduit, valeur.name),
+                    name_traduit: None,
+                    slug: valeur.slug,
+
+                    updated_at: valeur.updated_at,
+                }
+            )),
+            None => Ok(None),
+        }
+    }
 }
 
 #[async_trait::async_trait]
 impl CompatibleSQL for ThemeIGDB {
+    fn table() -> &'static str {
+        "themes"
+    }
+
     fn commande_enregistrer(&self) -> String {
         format!(
             r#"
@@ -624,16 +715,6 @@ impl CompatibleSQL for ThemeIGDB {
         )
     }
 
-    fn commande_charger_traduit(id: u32) -> String {
-        format!(
-            r#"
-            SELECT (id, COALESCE(name_traduit, name) AS name, slug, updated_at)
-            FROM themes WHERE "id" = {}
-            "#,
-            id.convertir(),
-        )
-    }
-
     async fn charger(id: u32) -> Result<Option<ThemeIGDB>, Erreur> {
         match sqlx::query_as::<_, ThemeIGDB>(
             &ThemeIGDB::commande_charger(id)
@@ -642,10 +723,30 @@ impl CompatibleSQL for ThemeIGDB {
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "theme", id }.as_err(),
         }
     }
+
+    async fn charger_traduit(id: u32) -> Result<Option<ThemeIGDB>, Erreur> {
+        match ThemeIGDB::charger(id).await? {
+            Some(valeur) => Ok(Some(
+                ThemeIGDB {
+                    id,
+                    name: determiner(valeur.name_traduit, valeur.name),
+                    name_traduit: None,
+                    slug: valeur.slug,
+
+                    updated_at: valeur.updated_at,
+                }
+            )),
+            None => Ok(None),
+        }
+    }
 }
 
 #[async_trait::async_trait]
 impl CompatibleSQL for MotCleIGDB {
+    fn table() -> &'static str {
+        "mots_cles"
+    }
+
     fn commande_enregistrer(&self) -> String {
         format!(
             r#"
@@ -679,16 +780,6 @@ impl CompatibleSQL for MotCleIGDB {
         )
     }
 
-    fn commande_charger_traduit(id: u32) -> String {
-        format!(
-            r#"
-            SELECT (id, COALESCE(name_traduit, name) AS name, slug, updated_at)
-            FROM mots_cles WHERE "id" = {}
-            "#,
-            id.convertir(),
-        )
-    }
-
     async fn charger(id: u32) -> Result<Option<MotCleIGDB>, Erreur> {
         match sqlx::query_as::<_, MotCleIGDB>(
             &MotCleIGDB::commande_charger(id)
@@ -697,10 +788,30 @@ impl CompatibleSQL for MotCleIGDB {
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "mot clé", id }.as_err(),
         }
     }
+
+    async fn charger_traduit(id: u32) -> Result<Option<MotCleIGDB>, Erreur> {
+        match MotCleIGDB::charger(id).await? {
+            Some(valeur) => Ok(Some(
+                MotCleIGDB {
+                    id,
+                    name: determiner(valeur.name_traduit, valeur.name),
+                    name_traduit: None,
+                    slug: valeur.slug,
+
+                    updated_at: valeur.updated_at,
+                }
+            )),
+            None => Ok(None),
+        }
+    }
 }
 
 #[async_trait::async_trait]
 impl CompatibleSQL for IllustrationIGDB {
+    fn table() -> &'static str {
+        "illustrations"
+    }
+
     fn commande_enregistrer(&self) -> String {
         format!(
             r#"
@@ -728,10 +839,6 @@ impl CompatibleSQL for IllustrationIGDB {
         )
     }
 
-    fn commande_charger_traduit(id: u32) -> String {
-        IllustrationIGDB::commande_charger(id)
-    }
-
     async fn charger(id: u32) -> Result<Option<IllustrationIGDB>, Erreur> {
         match sqlx::query_as::<_, IllustrationIGDB>(
             &IllustrationIGDB::commande_charger(id)
@@ -740,10 +847,18 @@ impl CompatibleSQL for IllustrationIGDB {
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "illustration", id }.as_err(),
         }
     }
+
+    async fn charger_traduit(id: u32) -> Result<Option<IllustrationIGDB>, Erreur> {
+        Ok(IllustrationIGDB::charger(id).await?)
+    }
 }
 
 #[async_trait::async_trait]
 impl CompatibleSQL for CaptureEcranIGDB {
+    fn table() -> &'static str {
+        "captures_ecran"
+    }
+
     fn commande_enregistrer(&self) -> String {
         format!(
             r#"
@@ -771,10 +886,6 @@ impl CompatibleSQL for CaptureEcranIGDB {
         )
     }
 
-    fn commande_charger_traduit(id: u32) -> String {
-        CaptureEcranIGDB::commande_charger(id)
-    }
-
     async fn charger(id: u32) -> Result<Option<CaptureEcranIGDB>, Erreur> {
         match sqlx::query_as::<_, CaptureEcranIGDB>(
             &CaptureEcranIGDB::commande_charger(id)
@@ -783,10 +894,18 @@ impl CompatibleSQL for CaptureEcranIGDB {
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "capture d'écran", id }.as_err(),
         }
     }
+
+    async fn charger_traduit(id: u32) -> Result<Option<CaptureEcranIGDB>, Erreur> {
+        Ok(CaptureEcranIGDB::charger(id).await?)
+    }
 }
 
 #[async_trait::async_trait]
 impl CompatibleSQL for VideoIGDB {
+    fn table() -> &'static str {
+        "videos"
+    }
+
     fn commande_enregistrer(&self) -> String {
         format!(
             r#"
@@ -819,15 +938,6 @@ impl CompatibleSQL for VideoIGDB {
         )
     }
 
-    fn commande_charger_traduit(id: u32) -> String {
-        format!(
-            r#"
-            SELECT (id, COALESCE(name_traduit, name) AS name, video_id) FROM videos WHERE "id" = {}
-            "#,
-            id.convertir(),
-        )
-    }
-
     async fn charger(id: u32) -> Result<Option<VideoIGDB>, Erreur> {
         match sqlx::query_as::<_, VideoIGDB>(
             &VideoIGDB::commande_charger(id)
@@ -836,10 +946,28 @@ impl CompatibleSQL for VideoIGDB {
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "vidéo", id }.as_err(),
         }
     }
+
+    async fn charger_traduit(id: u32) -> Result<Option<VideoIGDB>, Erreur> {
+        match VideoIGDB::charger(id).await? {
+            Some(valeur) => Ok(Some(
+                VideoIGDB {
+                    id,
+                    name: determiner(valeur.name_traduit, valeur.name),
+                    name_traduit: None,
+                    video_id: valeur.video_id,
+                }
+            )),
+            None => Ok(None),
+        }
+    }
 }
 
 #[async_trait::async_trait]
 impl CompatibleSQL for CategoriePlateformeIGDB {
+    fn table() -> &'static str {
+        "categories_plateforme"
+    }
+
     fn commande_enregistrer(&self) -> String {
         println!("ATTENTION: Impossible d'enregistrer une catégorie de plateforme.");
         format!("")
@@ -859,16 +987,6 @@ impl CompatibleSQL for CategoriePlateformeIGDB {
         )
     }
 
-    fn commande_charger_traduit(id: u32) -> String {
-        format!(
-            r#"
-            SELECT (id, COALESCE(name_traduit, name) AS name)
-            FROM categories_plateforme WHERE "id" = {}
-            "#,
-            id.convertir(),
-        )
-    }
-
     async fn charger(id: u32) -> Result<Option<CategoriePlateformeIGDB>, Erreur> {
         match sqlx::query_as::<_, CategoriePlateformeIGDB>(
             &CategoriePlateformeIGDB::commande_charger(id)
@@ -877,10 +995,27 @@ impl CompatibleSQL for CategoriePlateformeIGDB {
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "catégorie plateforme", id }.as_err(),
         }
     }
+
+    async fn charger_traduit(id: u32) -> Result<Option<CategoriePlateformeIGDB>, Erreur> {
+        match CategoriePlateformeIGDB::charger(id).await? {
+            Some(valeur) => Ok(Some(
+                CategoriePlateformeIGDB {
+                    id,
+                    name: determiner(valeur.name_traduit, valeur.name),
+                    name_traduit: None,
+                }
+            )),
+            None => Ok(None),
+        }
+    }
 }
 
 #[async_trait::async_trait]
 impl CompatibleSQL for LogoPlateformeIGDB {
+    fn table() -> &'static str {
+        "logos_plateforme"
+    }
+
     fn commande_enregistrer(&self) -> String {
         format!(
             r#"
@@ -908,10 +1043,6 @@ impl CompatibleSQL for LogoPlateformeIGDB {
         )
     }
 
-    fn commande_charger_traduit(id: u32) -> String {
-        LogoPlateformeIGDB::commande_charger(id)
-    }
-
     async fn charger(id: u32) -> Result<Option<LogoPlateformeIGDB>, Erreur> {
         match sqlx::query_as::<_, LogoPlateformeIGDB>(
             &LogoPlateformeIGDB::commande_charger(id)
@@ -920,10 +1051,18 @@ impl CompatibleSQL for LogoPlateformeIGDB {
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "logo plateforme", id }.as_err(),
         }
     }
+
+    async fn charger_traduit(id: u32) -> Result<Option<LogoPlateformeIGDB>, Erreur> {
+        Ok(LogoPlateformeIGDB::charger(id).await?)
+    }
 }
 
 #[async_trait::async_trait]
 impl CompatibleSQL for PlateformeIGDB {
+    fn table() -> &'static str {
+        "plateformes"
+    }
+
     fn commande_enregistrer(&self) -> String {
         format!(
             r#"
@@ -982,28 +1121,6 @@ impl CompatibleSQL for PlateformeIGDB {
         )
     }
 
-    fn commande_charger_traduit(id: u32) -> String {
-        format!(
-            r#"
-            SELECT (
-                id,
-                COALESCE(name_traduit, name) AS name,
-                slug,
-
-                COALESCE(storyline_traduit, storyline) AS storyline,
-                COALESCE(summary_traduit, summary) AS summary,
-
-                category,
-
-                platform_logo,
-
-                updated_at)
-            FROM plateformes WHERE "id" = {}
-            "#,
-            id.convertir(),
-        )
-    }
-
     async fn charger(id: u32) -> Result<Option<PlateformeIGDB>, Erreur> {
         let db = obtenir_db().await?;
         let resultat = match sqlx::query(
@@ -1033,10 +1150,37 @@ impl CompatibleSQL for PlateformeIGDB {
             updated_at: resultat.get("updated_at"),
         }))
     }
+
+    async fn charger_traduit(id: u32) -> Result<Option<PlateformeIGDB>, Erreur> {
+        match PlateformeIGDB::charger(id).await? {
+            Some(valeur) => Ok(Some(
+                PlateformeIGDB {
+                    id,
+                    name: determiner(valeur.name_traduit, valeur.name),
+                    name_traduit: None,
+                    slug: valeur.slug,
+
+                    summary: Some(determiner(valeur.summary_traduit, valeur.summary.unwrap_or(String::new()))),
+                    summary_traduit: None,
+
+                    category: valeur.category,
+
+                    platform_logo: valeur.platform_logo,
+
+                    updated_at: valeur.updated_at,
+                }
+            )),
+            None => Ok(None),
+        }
+    }
 }
 
 #[async_trait::async_trait]
 impl CompatibleSQL for LogoEntrepriseIGDB {
+    fn table() -> &'static str {
+        "logos_entreprise"
+    }
+
     fn commande_enregistrer(&self) -> String {
         format!(
             r#"
@@ -1064,10 +1208,6 @@ impl CompatibleSQL for LogoEntrepriseIGDB {
         )
     }
 
-    fn commande_charger_traduit(id: u32) -> String {
-        LogoEntrepriseIGDB::commande_charger(id)
-    }
-
     async fn charger(id: u32) -> Result<Option<LogoEntrepriseIGDB>, Erreur> {
         match sqlx::query_as::<_, LogoEntrepriseIGDB>(
             &LogoEntrepriseIGDB::commande_charger(id)
@@ -1076,10 +1216,18 @@ impl CompatibleSQL for LogoEntrepriseIGDB {
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "logo entreprise", id }.as_err(),
         }
     }
+
+    async fn charger_traduit(id: u32) -> Result<Option<LogoEntrepriseIGDB>, Erreur> {
+        Ok(LogoEntrepriseIGDB::charger(id).await?)
+    }
 }
 
 #[async_trait::async_trait]
 impl CompatibleSQL for EntrepriseIGDB {
+    fn table() -> &'static str {
+        "entreprises"
+    }
+
     fn commande_enregistrer(&self) -> String {
         format!(
             r#"
@@ -1142,29 +1290,6 @@ impl CompatibleSQL for EntrepriseIGDB {
         )
     }
 
-    fn commande_charger_traduit(id: u32) -> String {
-        format!(
-            r#"
-            SELECT (
-                id,
-                COALESCE(name_traduit, name) AS name,
-                slug,
-
-                COALESCE(description_traduit, description) AS description,
-
-                parent,
-
-                logo,
-
-                start_date,
-
-                updated_at)
-            FROM entreprises WHERE "id" = {}
-            "#,
-            id.convertir(),
-        )
-    }
-
     async fn charger(id: u32) -> Result<Option<EntrepriseIGDB>, Erreur> {
         let db = obtenir_db().await?;
         let resultat = match sqlx::query(
@@ -1222,6 +1347,34 @@ impl CompatibleSQL for EntrepriseIGDB {
 
             updated_at: resultat.get("updated_at"),
         }))
+    }
+
+    async fn charger_traduit(id: u32) -> Result<Option<EntrepriseIGDB>, Erreur> {
+        match EntrepriseIGDB::charger(id).await? {
+            Some(valeur) => Ok(Some(
+                EntrepriseIGDB {
+                    id,
+                    name: determiner(valeur.name_traduit, valeur.name),
+                    name_traduit: None,
+                    slug: valeur.slug,
+
+                    published: valeur.published,
+                    developed: valeur.developed,
+
+                    description: Some(determiner(valeur.description_traduit, valeur.description.unwrap_or(String::new()))),
+                    description_traduit: None,
+
+                    parent: valeur.parent,
+
+                    logo: valeur.logo,
+
+                    start_date: valeur.start_date,
+
+                    updated_at: valeur.updated_at,
+                }
+            )),
+            None => Ok(None),
+        }
     }
 }
 

@@ -86,7 +86,7 @@ impl TraitErreur for ErreurSQL {
     }
 }
 
-// Erreur Conversion Impossible
+// Erreur Chargement Impossible
 pub struct ErreurChargementImpossible {
     pub erreur: sqlx::Error,
     pub objet: &'static str,
@@ -109,6 +109,52 @@ impl TraitErreur for ErreurChargementImpossible {
     }
 }
 
+// Erreur Enregistrement Impossible
+pub struct ErreurEnregistrementImpossible {
+    pub erreur: sqlx::Error,
+    pub objet: &'static str,
+    pub id: u32,
+}
+
+impl ErreurEnregistrementImpossible {
+    pub fn as_err<T>(self) -> Result<T, Erreur> {
+        Err(Erreur::EnregistrementImpossible(self))
+    }
+}
+
+impl TraitErreur for ErreurEnregistrementImpossible {
+    fn message(&self) -> String {
+        format!("Impossible d'enregistrer {} id: {}.", self.objet, self.id)
+    }
+
+    fn cause(&self) -> Option<String> {
+        Some(format!("{}", self.erreur))
+    }
+}
+
+// Erreur Suppression Impossible
+pub struct ErreurSuppressionImpossible {
+    pub erreur: sqlx::Error,
+    pub objet: &'static str,
+    pub id: u32,
+}
+
+impl ErreurSuppressionImpossible {
+    pub fn as_err<T>(self) -> Result<T, Erreur> {
+        Err(Erreur::SuppressionImpossible(self))
+    }
+}
+
+impl TraitErreur for ErreurSuppressionImpossible {
+    fn message(&self) -> String {
+        format!("Impossible de supprimer {} id: {}.", self.objet, self.id)
+    }
+
+    fn cause(&self) -> Option<String> {
+        Some(format!("{}", self.erreur))
+    }
+}
+
 // Enum Erreur
 pub enum Erreur {
     ErreurLocalisationDB(ErreurLocalisationDB),
@@ -116,6 +162,8 @@ pub enum Erreur {
     ErreurCreationDB(ErreurCreationDB),
     ErreurSQL(ErreurSQL),
     ChargementImpossible(ErreurChargementImpossible),
+    EnregistrementImpossible(ErreurEnregistrementImpossible),
+    SuppressionImpossible(ErreurSuppressionImpossible),
 }
 
 impl Erreur {
@@ -126,6 +174,8 @@ impl Erreur {
             Erreur::ErreurCreationDB(erreur) => erreur,
             Erreur::ErreurSQL(erreur) => erreur,
             Erreur::ChargementImpossible(erreur) => erreur,
+            Erreur::EnregistrementImpossible(erreur) => erreur,
+            Erreur::SuppressionImpossible(erreur) => erreur,
         }
     }
 }
