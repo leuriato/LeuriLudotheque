@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, FromRow, Deserialize, Serialize)]
 pub struct JeuIGDB /*<'static>*/ {
     pub id: u32,
     pub name: String,
@@ -42,7 +43,7 @@ pub struct JeuIGDB /*<'static>*/ {
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, FromRow, Deserialize, Serialize)]
 pub struct NomAlternatifIGDB /*<'static>*/ {
     pub id: u32,
     pub comment: String,
@@ -51,7 +52,7 @@ pub struct NomAlternatifIGDB /*<'static>*/ {
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, FromRow, Deserialize, Serialize)]
 pub struct CollectionIGDB /*<'static>*/ {
     pub id: u32,
     pub name: String,
@@ -63,7 +64,7 @@ pub struct CollectionIGDB /*<'static>*/ {
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, FromRow, Deserialize, Serialize)]
 pub struct FranchiseIGDB /*<'static>*/ {
     pub id: u32,
     pub name: String,
@@ -74,27 +75,15 @@ pub struct FranchiseIGDB /*<'static>*/ {
     pub updated_at: Option<i64>,
 }
 
-#[derive(Debug, Clone)]
-pub enum CategorieJeuIGDB {
-    JeuPrincipal = 0,
-    GreffonDLC = 1,
-    Extension = 2,
-    OffreGroupee = 3,
-    ExtensionIndependante = 4,
-    Mod = 5,
-    Episode = 6,
-    Saison = 7,
-    Remake = 8,
-    Remaster = 9,
-    JeuEtendu = 10,
-    Portage = 11,
-    Fork = 12,
-    Paquet = 13,
-    MiseAJour = 14,
+#[derive(Debug, Clone, FromRow)]
+pub struct CategorieJeuIGDB {
+    pub id: u32,
+    pub name: String,
+    pub name_traduit: Option<String>,
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, FromRow, Deserialize, Serialize)]
 pub struct GenreIGDB /*<'static>*/ {
     pub id: u32,
     pub name: String,
@@ -106,7 +95,7 @@ pub struct GenreIGDB /*<'static>*/ {
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, FromRow, Deserialize, Serialize)]
 pub struct ThemeIGDB /*<'static>*/ {
     pub id: u32,
     pub name: String,
@@ -118,7 +107,7 @@ pub struct ThemeIGDB /*<'static>*/ {
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, FromRow, Deserialize, Serialize)]
 pub struct MotCleIGDB /*<'static>*/ {
     pub id: u32,
     pub name: String,
@@ -130,7 +119,7 @@ pub struct MotCleIGDB /*<'static>*/ {
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, FromRow, Deserialize, Serialize)]
 pub struct PlateformeIGDB /*<'static>*/ {
     pub id: u32,
     pub name: String,
@@ -148,18 +137,15 @@ pub struct PlateformeIGDB /*<'static>*/ {
     pub updated_at: Option<i64>,
 }
 
-#[derive(Debug, Clone)]
-pub enum CategoriePlateformeIGDB {
-    Console = 1,
-    Arcade = 2,
-    Plateforme = 3,
-    SystemeExploitation = 4,
-    ConsolePortable = 5,
-    Ordinateur = 6,
+#[derive(Debug, Clone, FromRow)]
+pub struct CategoriePlateformeIGDB {
+    pub id: u32,
+    pub name: String,
+    pub name_traduit: Option<String>,
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, FromRow, Deserialize, Serialize)]
 pub struct LogoPlateformeIGDB /*<'static>*/ {
     pub id: u32,
     pub url: String,
@@ -169,7 +155,7 @@ pub struct LogoPlateformeIGDB /*<'static>*/ {
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, FromRow, Deserialize, Serialize)]
 pub struct EntrepriseIGDB /*<'static>*/ {
     pub id: u32,
     pub name: String,
@@ -194,7 +180,7 @@ pub struct EntrepriseIGDB /*<'static>*/ {
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, FromRow, Deserialize, Serialize)]
 pub struct LogoEntrepriseIGDB /*<'static>*/ {
     pub id: u32,
     pub url: String,
@@ -204,7 +190,7 @@ pub struct LogoEntrepriseIGDB /*<'static>*/ {
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, FromRow, Deserialize, Serialize)]
 pub struct CouvertureIGDB /*<'static>*/ {
     pub id: u32,
     pub url: String,
@@ -214,7 +200,7 @@ pub struct CouvertureIGDB /*<'static>*/ {
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, FromRow, Deserialize, Serialize)]
 pub struct IllustrationIGDB /*<'static>*/ {
     pub id: u32,
     pub url: String,
@@ -224,7 +210,7 @@ pub struct IllustrationIGDB /*<'static>*/ {
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, FromRow, Deserialize, Serialize)]
 pub struct CaptureEcranIGDB /*<'static>*/ {
     pub id: u32,
     pub url: String,
@@ -234,7 +220,7 @@ pub struct CaptureEcranIGDB /*<'static>*/ {
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, FromRow, Deserialize, Serialize)]
 pub struct VideoIGDB /*<'static>*/ {
     pub id: u32,
     pub name: String,

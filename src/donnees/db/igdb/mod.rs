@@ -88,7 +88,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
     let _ = match sqlx::query(
         "CREATE TABLE IF NOT EXISTS couvertures (
             id INTEGER PRIMARY KEY NOT NULL,
-            url VARCHAR(500),
+            url TEXT,
 
             width INTEGER,
             height INTEGER
@@ -105,10 +105,10 @@ pub async fn creer_db() -> Result<(), Erreur> {
             name_traduit VARCHAR(250),
             slug VARCHAR(250) NOT NULL UNIQUE,
 
-            storyline VARCHAR(2000),
-            storyline_traduit VARCHAR(2000),
-            summary VARCHAR(2000),
-            summary_traduit VARCHAR(2000),
+            storyline TEXT,
+            storyline_traduit TEXT,
+            summary TEXT,
+            summary_traduit TEXT,
 
             first_release_date INTEGER,
 
@@ -122,7 +122,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
             cover INTEGER,
 
             updated_at INTEGER,
-            
+
             FOREIGN KEY (collection) REFERENCES collections (id),
             FOREIGN KEY (franchise) REFERENCES franchises (id),
             FOREIGN KEY (category) REFERENCES categories_jeu (id),
@@ -178,7 +178,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
     let _ = match sqlx::query(
         "CREATE TABLE IF NOT EXISTS illustrations (
             id INTEGER PRIMARY KEY NOT NULL,
-            url VARCHAR(500),
+            url TEXT,
 
             width INTEGER,
             height INTEGER
@@ -191,7 +191,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
     let _ = match sqlx::query(
         "CREATE TABLE IF NOT EXISTS captures_ecran (
             id INTEGER PRIMARY KEY NOT NULL,
-            url VARCHAR(500),
+            url TEXT,
 
             width INTEGER,
             height INTEGER
@@ -218,7 +218,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         "CREATE TABLE IF NOT EXISTS remakes (
             jeu INTEGER,
             remake INTEGER,
-            
+
             FOREIGN KEY (jeu) REFERENCES jeux (id),
             FOREIGN KEY (remake) REFERENCES jeux (id)
         );"
@@ -231,7 +231,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         "CREATE TABLE IF NOT EXISTS remasters (
             jeu INTEGER,
             remaster INTEGER,
-            
+
             FOREIGN KEY (jeu) REFERENCES jeux (id),
             FOREIGN KEY (remaster) REFERENCES jeux (id)
         );"
@@ -244,7 +244,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         "CREATE TABLE IF NOT EXISTS jeux_similaires (
             jeu INTEGER,
             jeu_similaire INTEGER,
-            
+
             FOREIGN KEY (jeu) REFERENCES jeux (id),
             FOREIGN KEY (jeu_similaire) REFERENCES jeux (id)
         );"
@@ -257,7 +257,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         "CREATE TABLE IF NOT EXISTS jeux_genres (
             jeu INTEGER,
             genre INTEGER,
-            
+
             FOREIGN KEY (jeu) REFERENCES jeux (id),
             FOREIGN KEY (genre) REFERENCES genres (id)
         );"
@@ -270,7 +270,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         "CREATE TABLE IF NOT EXISTS jeux_themes (
             jeu INTEGER,
             theme INTEGER,
-            
+
             FOREIGN KEY (jeu) REFERENCES jeux (id),
             FOREIGN KEY (theme) REFERENCES themes (id)
         );"
@@ -283,7 +283,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         "CREATE TABLE IF NOT EXISTS jeux_mots_cles (
             jeu INTEGER,
             mot_cle INTEGER,
-            
+
             FOREIGN KEY (jeu) REFERENCES jeux (id),
             FOREIGN KEY (mot_cle) REFERENCES mots_cles (id)
         );"
@@ -296,7 +296,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         "CREATE TABLE IF NOT EXISTS jeux_illustrations (
             jeu INTEGER,
             illustration INTEGER,
-            
+
             FOREIGN KEY (jeu) REFERENCES jeux (id),
             FOREIGN KEY (illustration) REFERENCES illustrations (id)
         );"
@@ -309,7 +309,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         "CREATE TABLE IF NOT EXISTS jeux_captures_ecran (
             jeu INTEGER,
             capture_ecran INTEGER,
-            
+
             FOREIGN KEY (jeu) REFERENCES jeux (id),
             FOREIGN KEY (capture_ecran) REFERENCES captures_ecran (id)
         );"
@@ -322,7 +322,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         "CREATE TABLE IF NOT EXISTS jeux_videos (
             jeu INTEGER,
             video INTEGER,
-            
+
             FOREIGN KEY (jeu) REFERENCES jeux (id),
             FOREIGN KEY (video) REFERENCES videos (id)
         );"
@@ -345,7 +345,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
     let _ = match sqlx::query(
         "CREATE TABLE IF NOT EXISTS logos_plateforme (
             id INTEGER PRIMARY KEY NOT NULL,
-            url VARCHAR(500),
+            url TEXT,
 
             width INTEGER,
             height INTEGER
@@ -362,15 +362,15 @@ pub async fn creer_db() -> Result<(), Erreur> {
             name_traduit VARCHAR(250),
             slug VARCHAR(250) NOT NULL UNIQUE,
 
-            summary VARCHAR(2000),
-            summary_traduit VARCHAR(2000),
+            summary TEXT,
+            summary_traduit TEXT,
 
             category INTEGER,
 
             platform_logo INTEGER,
 
             updated_at INTEGER,
-            
+
             FOREIGN KEY (category) REFERENCES categories_plateforme (id),
             FOREIGN KEY (platform_logo) REFERENCES logos_plateforme (id)
         );"
@@ -383,7 +383,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         "CREATE TABLE IF NOT EXISTS jeux_plateformes (
             jeu INTEGER,
             plateforme INTEGER,
-            
+
             FOREIGN KEY (jeu) REFERENCES jeux (id),
             FOREIGN KEY (plateforme) REFERENCES plateformes (id)
         );"
@@ -395,7 +395,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
     let _ = match sqlx::query(
         "CREATE TABLE IF NOT EXISTS logos_entreprise (
             id INTEGER PRIMARY KEY NOT NULL,
-            url VARCHAR(500),
+            url TEXT,
 
             width INTEGER,
             height INTEGER
@@ -412,8 +412,8 @@ pub async fn creer_db() -> Result<(), Erreur> {
             name_traduit VARCHAR(250),
             slug VARCHAR(250) NOT NULL UNIQUE,
 
-            description VARCHAR(2000),
-            description_traduit VARCHAR(2000),
+            description TEXT,
+            description_traduit TEXT,
 
             parent INTEGER,
 
@@ -422,7 +422,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
             start_date INTEGER,
 
             updated_at INTEGER,
-            
+
             FOREIGN KEY (parent) REFERENCES entreprises (id),
             FOREIGN KEY (logo) REFERENCES logos_entreprise (id)
         );"
@@ -438,7 +438,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
 
             developed BOOLEAN,
             published BOOLEAN,
-            
+
             FOREIGN KEY (jeu) REFERENCES jeux (id),
             FOREIGN KEY (entreprise) REFERENCES entreprises (id)
         );"
@@ -479,6 +479,20 @@ pub async fn creer_db() -> Result<(), Erreur> {
     ).execute(&db).await {
         Ok(valeur) => valeur,
         Err(erreur) => return ErreurSQL { erreur, desc: "l'insertion de categories_plateforme"}.as_err(),
+    };
+
+    let _ = match sqlx::query(
+        "CREATE TABLE IF NOT EXISTS chemins (
+            jeu INTEGER,
+            chemin TEXT,
+            nom VARCHAR(100),
+            langue VARCHAR(3),
+
+            FOREIGN KEY (jeu) REFERENCES jeux (id)
+        );"
+    ).execute(&db).await {
+        Ok(valeur) => valeur,
+        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table chemins"}.as_err(),
     };
 
     Ok(())

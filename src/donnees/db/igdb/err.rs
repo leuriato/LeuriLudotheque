@@ -87,22 +87,21 @@ impl TraitErreur for ErreurSQL {
 }
 
 // Erreur Conversion Impossible
-pub struct ErreurConversionImpossible {
-    pub erreur: serde_json::Error,
-    pub from: &'static str,
-    pub to: &'static str,
-    pub objet: Box<dyn std::fmt::Debug>,
+pub struct ErreurChargementImpossible {
+    pub erreur: sqlx::Error,
+    pub objet: &'static str,
+    pub id: u32,
 }
 
-impl ErreurConversionImpossible {
+impl ErreurChargementImpossible {
     pub fn as_err<T>(self) -> Result<T, Erreur> {
-        Err(Erreur::ConversionImpossible(self))
+        Err(Erreur::ChargementImpossible(self))
     }
 }
 
-impl TraitErreur for ErreurConversionImpossible {
+impl TraitErreur for ErreurChargementImpossible {
     fn message(&self) -> String {
-        format!("Impossible de convertir de {} vers {}.\nDétail:\n{:?}", self.from, self.to, self.objet)
+        format!("Impossible de charger {} id: {}.", self.objet, self.id)
     }
 
     fn cause(&self) -> Option<String> {
@@ -116,7 +115,7 @@ pub enum Erreur {
     ErreurAccesDB(ErreurAccesDB),
     ErreurCreationDB(ErreurCreationDB),
     ErreurSQL(ErreurSQL),
-    ConversionImpossible(ErreurConversionImpossible),
+    ChargementImpossible(ErreurChargementImpossible),
 }
 
 impl Erreur {
@@ -126,7 +125,7 @@ impl Erreur {
             Erreur::ErreurAccesDB(erreur) => erreur,
             Erreur::ErreurCreationDB(erreur) => erreur,
             Erreur::ErreurSQL(erreur) => erreur,
-            Erreur::ConversionImpossible(erreur) => erreur,
+            Erreur::ChargementImpossible(erreur) => erreur,
         }
     }
 }
