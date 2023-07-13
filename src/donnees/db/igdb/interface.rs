@@ -1,7 +1,7 @@
 use crate::api::igdb::objet::*;
 
 use super::{err::*, obtenir_db};
-use sqlx::Row;
+use sqlx::{Row, Pool, Sqlite};
 
 #[async_trait::async_trait]
 pub trait CompatibleSQL: Sized {
@@ -31,6 +31,15 @@ pub trait CompatibleSQL: Sized {
 
     async fn charger(id: u32) -> Result<Option<Self>, Erreur>;
     async fn charger_traduit(id: u32) -> Result<Option<Self>, Erreur>;
+
+    async fn enregistrer(&self) -> Result<(), Erreur> {
+        match sqlx::query(
+            &self.commande_enregistrer()
+        ).execute(&obtenir_db().await?).await {
+            Ok(_) => Ok(()),
+            Err(erreur) => ErreurEnregistrementImpossible { erreur, objet: Self::table() }.as_err(),
+        }
+    }
 }
 
 fn guillemeter(input: String) -> String {
@@ -608,6 +617,104 @@ impl CompatibleSQL for JeuIGDB {
             )),
             None => Ok(None),
         }
+    }
+
+    async fn enregistrer(&self) -> Result<(), Erreur> {
+        async fn supprimer(db: &Pool<Sqlite>, id: u32, table: &str) -> Result<(), Erreur> {
+            match sqlx::query(
+                &format!(r#"DELETE * FROM {} WHERE "jeu" = {};"#, &table, id)
+            ).execute(db).await {
+                Ok(_) => Ok(()),
+                Err(erreur) => ErreurSQL { erreur, desc: "la suppression d'un jeu dans une table de correspondance"}.as_err(),
+            }
+        }
+
+        async fn inserer(db: &Pool<Sqlite>, id: u32, liste: Vec<u32>, table: &str, champ: &str) -> Result<(), Erreur> {
+            for valeur in liste {
+                match sqlx::query(
+                    &format!(
+                        r#"
+                        INSERT INTO {} ("jeu", "{}") VALUES ({}, {});
+                        "#,
+                        &table,
+                        &champ,
+                        id,
+                        valeur
+                    )
+                ).execute(db).await {
+                    Ok(_) => {},
+                    Err(erreur) => return ErreurSQL { erreur, desc: "la suppression d'un jeu dans une table de correspondance"}.as_err(),
+                }
+            }
+            Ok(())
+        }
+
+        let db = obtenir_db().await?;
+
+        let genres = supprimer(&db, self.id, "jeux_genres");
+        let themes = supprimer(&db, self.id, "jeux_themes");
+        let mots_cles = supprimer(&db, self.id, "jeux_mots_cles");
+
+        let remakes = supprimer(&db, self.id, "jeux_remakes");
+        let remasters = supprimer(&db, self.id, "jeux_remasters");
+        let jeux_similaires = supprimer(&db, self.id, "jeux_similaires");
+
+        let plateformes = supprimer(&db, self.id, "jeux_plateformes");
+
+        let artworks = supprimer(&db, self.id, "jeux_illustrations");
+        let screenshots= supprimer(&db, self.id, "jeux_captures_ecran");
+        let videos = supprimer(&db, self.id, "jeux_videos");
+
+        genres.await?;
+        let liste: Vec<u32> = self.genres.clone().unwrap_or(vec![]).iter().map(|x| x.id).collect();
+        let genres = inserer(&db, self.id, liste, "jeux_genres", "genre");
+
+        themes.await?;
+        let liste: Vec<u32> = self.themes.clone().unwrap_or(vec![]).iter().map(|x| x.id).collect();
+        let themes = inserer(&db, self.id, liste, "jeux_themes", "theme");
+
+        mots_cles.await?;
+        let liste: Vec<u32> = self.keywords.clone().unwrap_or(vec![]).iter().map(|x| x.id).collect();
+        let mots_cles = inserer(&db, self.id, liste, "jeux_mots_cles", "mot_cle");
+
+        remakes.await?;
+        let remakes = inserer(&db, self.id, self.remakes.clone().unwrap_or(vec![]), "jeux_remakes", "remake");
+
+        remasters.await?;
+        let remasters = inserer(&db, self.id, self.remasters.clone().unwrap_or(vec![]), "jeux_remasters", "remaster");
+
+        jeux_similaires.await?;
+        let jeux_similaires = inserer(&db, self.id, self.similar_games.clone().unwrap_or(vec![]), "jeux_similaires", "jeu_similaire");
+
+        plateformes.await?;
+        let plateformes = inserer(&db, self.id, self.platforms.clone().unwrap_or(vec![]), "jeux_genres", "genre");
+
+        artworks.await?;
+        let liste: Vec<u32> = self.artworks.clone().unwrap_or(vec![]).iter().map(|x| x.id).collect();
+        let artworks = inserer(&db, self.id, liste, "jeux_illustrations", "illustration");
+
+        screenshots.await?;
+        let liste: Vec<u32> = self.screenshots.clone().unwrap_or(vec![]).iter().map(|x| x.id).collect();
+        let screenshots = inserer(&db, self.id, liste, "jeux_captures_ecran", "capture_ecran");
+
+        videos.await?;
+        let liste: Vec<u32> = self.videos.clone().unwrap_or(vec![]).iter().map(|x| x.id).collect();
+        let videos = inserer(&db, self.id, liste, "jeux_videos", "videos");
+
+        CompatibleSQL::enregistrer(self).await?;
+
+        genres.await?;
+        themes.await?;
+        mots_cles.await?;
+        remakes.await?;
+        remasters.await?;
+        jeux_similaires.await?;
+        plateformes.await?;
+        artworks.await?;
+        screenshots.await?;
+        videos.await?;
+
+        Ok(())
     }
 }
 

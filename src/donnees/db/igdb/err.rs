@@ -113,7 +113,6 @@ impl TraitErreur for ErreurChargementImpossible {
 pub struct ErreurEnregistrementImpossible {
     pub erreur: sqlx::Error,
     pub objet: &'static str,
-    pub id: u32,
 }
 
 impl ErreurEnregistrementImpossible {
@@ -124,7 +123,7 @@ impl ErreurEnregistrementImpossible {
 
 impl TraitErreur for ErreurEnregistrementImpossible {
     fn message(&self) -> String {
-        format!("Impossible d'enregistrer {} id: {}.", self.objet, self.id)
+        format!("Impossible d'enregistrer {}.", self.objet)
     }
 
     fn cause(&self) -> Option<String> {
