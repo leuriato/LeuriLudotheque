@@ -1,10 +1,11 @@
 pub mod err;
+pub mod extra;
 pub mod interface;
 
 use sqlx::SqlitePool;
 use sqlx::{Sqlite, Pool, migrate::MigrateDatabase};
 
-use crate::donnees::db::igdb::err::*;
+use crate::donnees::igdb::err::*;
 use crate::chemin::chemins::{determiner_chemin, XDG};
 
 pub fn obtenir_db_url<'a>() -> Result<String, Erreur> {
@@ -121,13 +122,13 @@ pub async fn creer_db() -> Result<(), Erreur> {
 
             cover INTEGER,
 
-            updated_at INTEGER,
-
+            updated_at INTEGER
+        );" /*
             FOREIGN KEY (collection) REFERENCES collections (id),
             FOREIGN KEY (franchise) REFERENCES franchises (id),
             FOREIGN KEY (category) REFERENCES categories_jeu (id),
             FOREIGN KEY (cover) REFERENCES couvertures (id)
-        );"
+        );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
         Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table jeux"}.as_err(),
@@ -215,26 +216,26 @@ pub async fn creer_db() -> Result<(), Erreur> {
     };
 
     let _ = match sqlx::query(
-        "CREATE TABLE IF NOT EXISTS remakes (
+        "CREATE TABLE IF NOT EXISTS jeux_remakes (
             jeu INTEGER,
-            remake INTEGER,
-
+            remake INTEGER
+        );"/*
             FOREIGN KEY (jeu) REFERENCES jeux (id),
             FOREIGN KEY (remake) REFERENCES jeux (id)
-        );"
+        );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
         Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table remakes"}.as_err(),
     };
 
     let _ = match sqlx::query(
-        "CREATE TABLE IF NOT EXISTS remasters (
+        "CREATE TABLE IF NOT EXISTS jeux_remasters (
             jeu INTEGER,
-            remaster INTEGER,
-
+            remaster INTEGER
+        );"/*
             FOREIGN KEY (jeu) REFERENCES jeux (id),
             FOREIGN KEY (remaster) REFERENCES jeux (id)
-        );"
+        );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
         Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table remasters"}.as_err(),
@@ -243,11 +244,11 @@ pub async fn creer_db() -> Result<(), Erreur> {
     let _ = match sqlx::query(
         "CREATE TABLE IF NOT EXISTS jeux_similaires (
             jeu INTEGER,
-            jeu_similaire INTEGER,
-
+            jeu_similaire INTEGER
+        );"/*
             FOREIGN KEY (jeu) REFERENCES jeux (id),
             FOREIGN KEY (jeu_similaire) REFERENCES jeux (id)
-        );"
+        );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
         Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table jeux_similaires"}.as_err(),
@@ -256,11 +257,11 @@ pub async fn creer_db() -> Result<(), Erreur> {
     let _ = match sqlx::query(
         "CREATE TABLE IF NOT EXISTS jeux_genres (
             jeu INTEGER,
-            genre INTEGER,
-
+            genre INTEGER
+        );"/*
             FOREIGN KEY (jeu) REFERENCES jeux (id),
             FOREIGN KEY (genre) REFERENCES genres (id)
-        );"
+        );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
         Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table jeux_genres"}.as_err(),
@@ -269,11 +270,11 @@ pub async fn creer_db() -> Result<(), Erreur> {
     let _ = match sqlx::query(
         "CREATE TABLE IF NOT EXISTS jeux_themes (
             jeu INTEGER,
-            theme INTEGER,
-
+            theme INTEGER
+        );"/*
             FOREIGN KEY (jeu) REFERENCES jeux (id),
             FOREIGN KEY (theme) REFERENCES themes (id)
-        );"
+        );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
         Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table jeux_themes"}.as_err(),
@@ -282,11 +283,11 @@ pub async fn creer_db() -> Result<(), Erreur> {
     let _ = match sqlx::query(
         "CREATE TABLE IF NOT EXISTS jeux_mots_cles (
             jeu INTEGER,
-            mot_cle INTEGER,
-
+            mot_cle INTEGER
+        );"/*
             FOREIGN KEY (jeu) REFERENCES jeux (id),
             FOREIGN KEY (mot_cle) REFERENCES mots_cles (id)
-        );"
+        );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
         Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table jeux_mots_cles"}.as_err(),
@@ -295,11 +296,11 @@ pub async fn creer_db() -> Result<(), Erreur> {
     let _ = match sqlx::query(
         "CREATE TABLE IF NOT EXISTS jeux_illustrations (
             jeu INTEGER,
-            illustration INTEGER,
-
+            illustration INTEGER
+        );"/*
             FOREIGN KEY (jeu) REFERENCES jeux (id),
             FOREIGN KEY (illustration) REFERENCES illustrations (id)
-        );"
+        );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
         Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table jeux_illustrations"}.as_err(),
@@ -308,11 +309,11 @@ pub async fn creer_db() -> Result<(), Erreur> {
     let _ = match sqlx::query(
         "CREATE TABLE IF NOT EXISTS jeux_captures_ecran (
             jeu INTEGER,
-            capture_ecran INTEGER,
-
+            capture_ecran INTEGER
+        );"/*
             FOREIGN KEY (jeu) REFERENCES jeux (id),
             FOREIGN KEY (capture_ecran) REFERENCES captures_ecran (id)
-        );"
+        );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
         Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table jeux_captures_ecran"}.as_err(),
@@ -321,11 +322,11 @@ pub async fn creer_db() -> Result<(), Erreur> {
     let _ = match sqlx::query(
         "CREATE TABLE IF NOT EXISTS jeux_videos (
             jeu INTEGER,
-            video INTEGER,
-
+            video INTEGER
+        );"/*
             FOREIGN KEY (jeu) REFERENCES jeux (id),
             FOREIGN KEY (video) REFERENCES videos (id)
-        );"
+        );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
         Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table jeux_videos"}.as_err(),
@@ -369,11 +370,11 @@ pub async fn creer_db() -> Result<(), Erreur> {
 
             platform_logo INTEGER,
 
-            updated_at INTEGER,
-
+            updated_at INTEGER
+        );"/*
             FOREIGN KEY (category) REFERENCES categories_plateforme (id),
             FOREIGN KEY (platform_logo) REFERENCES logos_plateforme (id)
-        );"
+        );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
         Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table plateformes"}.as_err(),
@@ -382,11 +383,11 @@ pub async fn creer_db() -> Result<(), Erreur> {
     let _ = match sqlx::query(
         "CREATE TABLE IF NOT EXISTS jeux_plateformes (
             jeu INTEGER,
-            plateforme INTEGER,
-
+            plateforme INTEGER
+        );"/*
             FOREIGN KEY (jeu) REFERENCES jeux (id),
             FOREIGN KEY (plateforme) REFERENCES plateformes (id)
-        );"
+        );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
         Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table jeux_plateformes"}.as_err(),
@@ -421,11 +422,11 @@ pub async fn creer_db() -> Result<(), Erreur> {
 
             start_date INTEGER,
 
-            updated_at INTEGER,
-
+            updated_at INTEGER
+        );"/*
             FOREIGN KEY (parent) REFERENCES entreprises (id),
             FOREIGN KEY (logo) REFERENCES logos_entreprise (id)
-        );"
+        );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
         Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table entreprises"}.as_err(),
@@ -437,11 +438,11 @@ pub async fn creer_db() -> Result<(), Erreur> {
             entreprise INTEGER,
 
             developed BOOLEAN,
-            published BOOLEAN,
-
+            published BOOLEAN
+        );"/*
             FOREIGN KEY (jeu) REFERENCES jeux (id),
             FOREIGN KEY (entreprise) REFERENCES entreprises (id)
-        );"
+        );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
         Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table jeux_entreprises"}.as_err(),
@@ -482,17 +483,25 @@ pub async fn creer_db() -> Result<(), Erreur> {
     };
 
     let _ = match sqlx::query(
-        "CREATE TABLE IF NOT EXISTS chemins (
+        "CREATE TABLE IF NOT EXISTS catalogue (
             jeu INTEGER,
             chemin TEXT,
             nom VARCHAR(100),
-            langue VARCHAR(3),
-
+            langue VARCHAR(3)
+        );"/*
             FOREIGN KEY (jeu) REFERENCES jeux (id)
-        );"
+        );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table chemins"}.as_err(),
+        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table catalogue"}.as_err(),
+    };
+
+    let _ = match sqlx::query(
+        "INSERT INTO \"jeux\" (\"id\", \"name\", \"slug\") VALUES
+            (0, 'Unknown', 'unknown');"
+    ).execute(&db).await {
+        Ok(valeur) => valeur,
+        Err(erreur) => return ErreurSQL { erreur, desc: "l'insertion de jeux"}.as_err(),
     };
 
     Ok(())

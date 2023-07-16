@@ -1,6 +1,15 @@
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
+#[derive(Debug, Clone, FromRow)]
+pub struct Jeu {
+    pub jeu: Option<u32>,
+//    pub jeu: Option<JeuIGDB>,
+    pub chemin: String,
+    pub nom: String,
+    pub langue: String,
+}
+
 #[serde_with::skip_serializing_none]
 #[derive(Debug, Clone, FromRow, Deserialize, Serialize)]
 pub struct JeuIGDB /*<'static>*/ {
@@ -46,7 +55,7 @@ pub struct JeuIGDB /*<'static>*/ {
 #[derive(Debug, Clone, FromRow, Deserialize, Serialize)]
 pub struct NomAlternatifIGDB /*<'static>*/ {
     pub id: u32,
-    pub comment: String,
+    pub comment: Option<String>,
     pub name: String,
     pub game: Option<u32>,
 }

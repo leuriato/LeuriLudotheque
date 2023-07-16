@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-gtk = { git = "https://github.com/gtk-rs/gtk3-rs.git" }
+gtk = { version = "0.6.6", package = "gtk4", features = ["v4_10"] }
 config = "0.13"
 dirs = "3.0"
 serde = { version = "1", features = ["derive"] }
@@ -15,7 +15,9 @@ xdg = "^2.1"
 async-std = "1.12.0"
 reqwest = "0.11.18"
 serde_with = "3.0.0"
+# sqlx = { version = "0.7.0", features = ["sqlite"]}
 sqlx = { version = "0.7.0", features = ["runtime-tokio-native-tls", "sqlite"]}
 tokio = { version = "1.20.0", features = ["rt-multi-thread", "macros"]}
 async-trait = "0.1.71"
 lazy_static = "1.4.0"
+gdk = "0.17.1"

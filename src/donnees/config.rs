@@ -10,6 +10,7 @@ pub struct LudothequeConfig {
     pub emulateurs: Vec<Emulateur>,
     pub repertoire_jeux: Option<PathBuf>,
     pub repertoire_donnees: Option<PathBuf>,
+    pub  profondeur_recherche: Option<u32>,
     pub langue: String,
 }
 
@@ -38,6 +39,7 @@ pub fn config_par_defaut() -> LudothequeConfig {
             ],
         emulateurs: vec![],
         repertoire_jeux: dirs::home_dir(),
+        profondeur_recherche: Some(1),
         repertoire_donnees: Some(xdg_dirs.get_data_home()),
         langue: format!("French"),
     }

@@ -1,13 +1,12 @@
 pub mod err;
 pub mod requete;
-pub mod objet;
 
 use crate::api::igdb::err::*;
 use crate::api::igdb::requete::*;
 use crate::chemin::{json, chemins};
 use crate::interne::erreurs::TraitErreur;
 
-use async_std::task;
+//use async_std::task;
 use serde::de::DeserializeOwned;
 use serde::{Serialize, Deserialize};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};

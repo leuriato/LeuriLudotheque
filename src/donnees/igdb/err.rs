@@ -154,6 +154,28 @@ impl TraitErreur for ErreurSuppressionImpossible {
     }
 }
 
+// Erreur Traduction Impossible
+pub struct ErreurTraductionImpossible {
+    pub erreur: sqlx::Error,
+    pub objet: &'static str,
+}
+
+impl ErreurTraductionImpossible {
+    pub fn as_err<T>(self) -> Result<T, Erreur> {
+        Err(Erreur::TraductionImpossible(self))
+    }
+}
+
+impl TraitErreur for ErreurTraductionImpossible {
+    fn message(&self) -> String {
+        format!("Impossible de traduire {}.", self.objet)
+    }
+
+    fn cause(&self) -> Option<String> {
+        Some(format!("{}", self.erreur))
+    }
+}
+
 // Enum Erreur
 pub enum Erreur {
     ErreurLocalisationDB(ErreurLocalisationDB),
@@ -163,6 +185,7 @@ pub enum Erreur {
     ChargementImpossible(ErreurChargementImpossible),
     EnregistrementImpossible(ErreurEnregistrementImpossible),
     SuppressionImpossible(ErreurSuppressionImpossible),
+    TraductionImpossible(ErreurTraductionImpossible),
 }
 
 impl Erreur {
@@ -175,6 +198,7 @@ impl Erreur {
             Erreur::ChargementImpossible(erreur) => erreur,
             Erreur::EnregistrementImpossible(erreur) => erreur,
             Erreur::SuppressionImpossible(erreur) => erreur,
+            Erreur::TraductionImpossible(erreur) => erreur,
         }
     }
 }

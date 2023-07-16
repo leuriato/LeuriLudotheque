@@ -2,7 +2,7 @@ pub mod err;
 
 use crate::donnees::config::obtenir_config;
 use crate::outils::trad::igdb::err::*;
-use crate::api::igdb::objet::*;
+use crate::donnees::objet::*;
 
 use serde::Serialize;
 
@@ -33,7 +33,7 @@ impl Traduisible for JeuIGDB {
         let config = obtenir_config();
 
         format!(
-            "Translate this game into {} (the name of the game should be the {} title when provided) and delete \"alternative_names\"",
+            "Translate this game into {} (the name of the game should not be modified unless a {} altenative title is provided) and delete \"alternative_names\"",
             config.langue,
             config.langue,
         )

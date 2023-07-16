@@ -1,6 +1,6 @@
 //use serde::{Deserialize, de::DeserializeOwned};
 
-use crate::api::igdb::objet;
+use crate::donnees::objet;
 
 #[derive(Debug)]
 pub struct Requete<T> {
@@ -33,4 +33,21 @@ pub fn requete_trouver_jeu(
         resultat: None,
     }
 
+}
+
+pub fn requete_recuperer_jeu(id: u32) -> Requete<Vec<objet::JeuIGDB>> {
+    Requete {
+        endpoint: format!("games/"),
+        corps: format!("{}{}{}",
+            format!("where id = {};", id),
+            concat!(
+                "fields name, slug, alternative_names.*, storyline, summary, first_release_date, ",
+                "collection.*, franchise.*, category, genres.*, themes.*, keywords.*, platforms, ",
+                "remakes, remasters, similar_games, rating, rating_count, cover.*, artworks.*, ",
+                "screenshots.*, videos.*, updated_at;"
+            ),
+            "limit 1;",
+        ),
+        resultat: None,
+    }
 }
