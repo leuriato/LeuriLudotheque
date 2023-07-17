@@ -23,7 +23,7 @@ pub async fn telecharger_couvertures() {
             //println!("CouvertureIGDB trouvée");
 
             let chemin = chemins::determiner_chemin(
-                format!("{}.jpg", id),
+                format!("{}.png", id),
                 chemins::XDG::CACHE
             ).unwrap();
 
@@ -39,14 +39,14 @@ pub async fn telecharger_couvertures() {
             Command::new("sh")
                 .arg("-c")
                 .arg(commande)
-                .spawn()
+                .output()
                 .expect("Impossible de télécharger la couverture.");
 
-            std::thread::sleep(std::time::Duration::from_millis(2500));
+            std::thread::sleep(std::time::Duration::from_millis(1000));
         }
     }
 
-    let chemin = chemins::determiner_chemin(String::from("0.jpg"), chemins::XDG::CACHE).unwrap();
+    let chemin = chemins::determiner_chemin(String::from("0.png"), chemins::XDG::CACHE).unwrap();
     if !chemin.exists() {
         Command::new("sh")
             .arg("-c")

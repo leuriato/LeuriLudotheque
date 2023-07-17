@@ -2,6 +2,7 @@ pub mod err;
 
 use crate::api::openai::objet::ReponseGPT;
 use crate::donnees::igdb::extra::obtenir_catalogue;
+use crate::donnees::igdb::obtenir_db;
 use crate::donnees::igdb::interface::CompatibleSQL;
 use crate::interne::erreurs::TraitErreur;
 use crate::outils::scan::err::*;
@@ -101,7 +102,7 @@ pub fn trouver_jeux() -> Vec<PathBuf> {
     jeux
 }
 
-pub async fn identifier_jeu(chemin: PathBuf, traduire: bool) -> Result<(), Erreur> {
+pub async fn identifier_jeu(chemin: PathBuf, db: &sqlx::Pool<sqlx::Sqlite>, traduire: bool) -> Result<(), Erreur> {
     let chemin_str: String = match chemin.as_path().as_os_str().to_str() {
         Some(valeur) => String::from(valeur),
         None => return ErreurIdentification {
@@ -113,9 +114,9 @@ pub async fn identifier_jeu(chemin: PathBuf, traduire: bool) -> Result<(), Erreu
 
     let mut id_jeu: Option<u32> = None;
 
-    if Jeu::existe(chemin_str.clone()).await.unwrap() {
-        if let Some(id) = Jeu::charger(chemin_str.clone()).await.unwrap().unwrap().jeu {
-            if JeuIGDB::existe(id).await.unwrap() {
+    if Jeu::existe_db(chemin_str.clone(), db).await.unwrap() {
+        if let Some(id) = Jeu::charger_db(chemin_str.clone(), db).await.unwrap().unwrap().jeu {
+            if JeuIGDB::existe_db(id, db).await.unwrap() {
                 println!("{} déjà enregistré.", chemin_str);
                 return Ok(());
             } else {
@@ -157,7 +158,6 @@ pub async fn identifier_jeu(chemin: PathBuf, traduire: bool) -> Result<(), Erreu
             Err(_) => langue = Some(meta)
         }
     }
-
 
     let jeu_igdb: JeuIGDB;
     let mut nom_jeu: String;
@@ -210,10 +210,10 @@ pub async fn identifier_jeu(chemin: PathBuf, traduire: bool) -> Result<(), Erreu
         jeu_igdb = resultat[0].clone();
         std::thread::sleep(std::time::Duration::from_millis(250))
     } else {
-        jeu_igdb = JeuIGDB::charger(0).await.unwrap().unwrap();
+        jeu_igdb = JeuIGDB::charger_db(0, db).await.unwrap().unwrap();
     }
 
-    match jeu_igdb.enregistrer().await {
+    match jeu_igdb.enregistrer_db(db).await {
         Ok(_) => {},
         Err(erreur) => return ErreurIdentification { chemin, desc: "Impossible d'enregistrer le jeu.", erreur: Some(erreur.to_string()) }.as_err(),
     }
@@ -243,7 +243,7 @@ pub async fn identifier_jeu(chemin: PathBuf, traduire: bool) -> Result<(), Erreu
             Err(erreur) => return ErreurIdentification { chemin, desc: "ChatGPT a répondu n'importe quoi.", erreur: Some(erreur.to_string()) }.as_err(),
         };
 
-        match jeu_traduit.traduire().await {
+        match jeu_traduit.traduire_db(db).await {
             Ok(_) => {},
             Err(erreur) => return ErreurIdentification { chemin, desc: "Impossible d'enregistrer le jeu traduit.", erreur: Some(erreur.to_string()) }.as_err(),
         }
@@ -267,7 +267,7 @@ pub async fn identifier_jeu(chemin: PathBuf, traduire: bool) -> Result<(), Erreu
 
     let jeu = Jeu { jeu: Some(jeu_igdb.id), chemin: chemin_str.clone(), nom: nom_jeu, langue: langue.unwrap_or(String::new()).to_uppercase() };
 
-    match jeu.enregistrer().await {
+    match jeu.enregistrer_db(db).await {
         Ok(_) => {},
         Err(erreur) => return ErreurIdentification { chemin, desc: "Impossible d'enregistrer le jeu dans le catalogue.", erreur: Some(erreur.to_string()) }.as_err(),
     }
@@ -280,12 +280,14 @@ pub async fn identifier_jeu(chemin: PathBuf, traduire: bool) -> Result<(), Erreu
 pub async fn nettoyer_catalogue() {
     let jeux = obtenir_catalogue().await;
 
+    let db = obtenir_db().await.unwrap();
     for jeu in jeux {
         if !std::path::Path::new(&jeu.chemin).exists() {
             println!("{} supprimé.", &jeu.chemin);
-            let _ = Jeu::supprimer(jeu.chemin).await;
+            let _ = Jeu::supprimer_db(jeu.chemin, &db).await;
         }
     }
+    db.close().await;
 }
 
 pub async fn scanner() {
@@ -294,10 +296,14 @@ pub async fn scanner() {
     let liste = trouver_jeux();
     nettoyage.await;
 
+    let db = obtenir_db().await.unwrap();
     for chemin in liste {
-        match identifier_jeu(chemin, false).await {
+        //println!("{chemin:?}");
+        match identifier_jeu(chemin, &db, false).await {
             Ok(_) => {},
             Err(erreur) => erreur.afficher_erreur(),
         }
+        std::thread::sleep(std::time::Duration::from_millis(100));
     }
+    db.close().await;
 }

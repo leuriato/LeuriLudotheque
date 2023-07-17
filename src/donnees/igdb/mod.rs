@@ -24,7 +24,7 @@ async fn db_existe() -> Result<bool, Erreur> {
     }
 }
 
-async fn obtenir_db() -> Result<Pool<Sqlite>, Erreur> {
+pub async fn obtenir_db() -> Result<Pool<Sqlite>, Erreur> {
     match SqlitePool::connect(&obtenir_db_url()?).await {
         Ok(db) => Ok(db),
         Err(erreur) => ErreurAccesDB { erreur }.as_err(),
@@ -58,7 +58,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table collections"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table collections"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -72,7 +72,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table franchises"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table franchises"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -83,7 +83,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table categories_jeu"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table categories_jeu"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -96,7 +96,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table couvertures"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table couvertures"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -131,7 +131,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table jeux"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table jeux"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -145,7 +145,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table genres"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table genres"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -159,7 +159,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table themes"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table themes"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -173,7 +173,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table mots_cles"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table mots_cles"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -186,7 +186,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table illustrations"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table illustrations"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -199,7 +199,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table captures_ecran"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table captures_ecran"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -212,7 +212,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table videos"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table videos"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -225,7 +225,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table remakes"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table remakes"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -238,7 +238,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table remasters"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table remasters"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -251,7 +251,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table jeux_similaires"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table jeux_similaires"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -264,7 +264,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table jeux_genres"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table jeux_genres"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -277,7 +277,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table jeux_themes"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table jeux_themes"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -290,7 +290,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table jeux_mots_cles"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table jeux_mots_cles"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -303,7 +303,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table jeux_illustrations"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table jeux_illustrations"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -316,7 +316,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table jeux_captures_ecran"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table jeux_captures_ecran"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -329,7 +329,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table jeux_videos"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table jeux_videos"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -340,7 +340,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table categories_plateforme"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table categories_plateforme"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -353,7 +353,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table logos_plateforme"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table logos_plateforme"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -377,7 +377,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table plateformes"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table plateformes"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -390,7 +390,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table jeux_plateformes"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table jeux_plateformes"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -403,7 +403,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table logos_entreprise"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table logos_entreprise"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -429,7 +429,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table entreprises"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table entreprises"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -445,7 +445,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table jeux_entreprises"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table jeux_entreprises"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -467,7 +467,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
             (14, 'Update', 'Mise à jour');"
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "l'insertion de categories_jeu"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "l'insertion de categories_jeu"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -479,7 +479,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
             (5, 'Computer', 'Ordinateur');"
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "l'insertion de categories_plateforme"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "l'insertion de categories_plateforme"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -493,7 +493,7 @@ pub async fn creer_db() -> Result<(), Erreur> {
         );"*/
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "la création de la table catalogue"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "la création de la table catalogue"}.as_err()},
     };
 
     let _ = match sqlx::query(
@@ -501,8 +501,10 @@ pub async fn creer_db() -> Result<(), Erreur> {
             (0, 'Unknown', 'unknown');"
     ).execute(&db).await {
         Ok(valeur) => valeur,
-        Err(erreur) => return ErreurSQL { erreur, desc: "l'insertion de jeux"}.as_err(),
+        Err(erreur) => {db.close().await;return ErreurSQL { erreur, desc: "l'insertion de jeux"}.as_err()},
     };
+
+    db.close().await;
 
     Ok(())
 }

@@ -12,59 +12,108 @@ pub trait CompatibleSQL<'a, U: ValeurSQL + Send>: Sized + Send {
     fn commande_traduire(&self) -> String;
     fn commande_charger<T: ValeurSQL>(id: T) -> String;
 
-    async fn existe<'b>(id: U) -> Result<bool, Erreur> where U: 'b {
+    async fn existe_db<'b>(id: U, db: &Pool<Sqlite>) -> Result<bool, Erreur> where U: 'b {
         match sqlx::query(
             &format!(
-                "SELECT * FROM {} WHERE \"jeu\" = {} OR \"id\" = {} OR \"chemin\" = {};",
+                "SELECT COUNT(*) AS count FROM {} WHERE \"jeu\" = {} OR \"id\" = {} OR \"chemin\" = {};",
                 Self::table(),
                 id.convertir(),
                 id.convertir(),
                 id.convertir(),
             )
-        ).fetch_optional(&obtenir_db().await?).await {
-            Ok(valeur) => Ok(valeur.is_some()),
+        ).fetch_one(db).await {
+            Ok(valeur) => Ok(valeur.get::<u32, _>("count") > 0),
             Err(erreur) => ErreurChargementImpossible { erreur, objet: Self::table(), id: 0 }.as_err(),
         }
     }
 
-    async fn supprimer<'b>(id: U) -> Result<(), Erreur> where U: 'b {
+    async fn existe<'b>(id: U) -> Result<bool, Erreur> where U: 'b {
+        let db = obtenir_db().await?;
+        let res = Self::existe_db(id, &db).await;
+        db.close().await;
+        res
+    }
+
+    async fn supprimer_db<'b>(id: U, db: &Pool<Sqlite>) -> Result<(), Erreur> where U: 'b {
         match sqlx::query(
             &format!("DELETE FROM {} WHERE \"jeu\" = {} or \"chemin\" = {};",
                      Self::table(),
                      &id.convertir(),
                      &id.convertir())
-        ).fetch_optional(&obtenir_db().await?).await {
+        ).fetch_optional(db).await {
             Ok(_) => Ok(()),
             Err(erreur) => ErreurSuppressionImpossible { erreur, objet: Self::table(), id: 0 }.as_err(),
         }
     }
 
-    async fn charger(id: U) -> Result<Option<Self>, Erreur>;
-    async fn charger_traduit(id: U) -> Result<Option<Self>, Erreur>;
+    async fn supprimer<'b>(id: U) -> Result<(), Erreur> where U: 'b {
+        let db = obtenir_db().await?;
+        let res = Self::supprimer_db(id, &db).await;
+        db.close().await;
+        res
+    }
 
-    async fn inserer(&self) -> Result<(), Erreur> {
+    async fn charger_db(id: U, db: &Pool<Sqlite>) -> Result<Option<Self>, Erreur>;
+    async fn charger_traduit_db(id: U, db: &Pool<Sqlite>) -> Result<Option<Self>, Erreur>;
+
+    async fn charger<'b>(id: U) -> Result<Option<Self>, Erreur> where U: 'b {
+        let db = obtenir_db().await?;
+        let res = Self::charger_db(id, &db).await;
+        db.close().await;
+        res
+    }
+
+    async fn charger_traduit<'b>(id: U) -> Result<Option<Self>, Erreur> where U:'b {
+        let db = obtenir_db().await?;
+        let res = Self::charger_traduit_db(id, &db).await;
+        db.close().await;
+        res
+    }
+
+    async fn inserer_db(&self, db: &Pool<Sqlite>) -> Result<(), Erreur> {
         match sqlx::query(
             &self.commande_enregistrer()
-        ).execute(&obtenir_db().await?).await {
+        ).execute(db).await {
             Ok(_) => Ok(()),
             Err(erreur) => ErreurEnregistrementImpossible { erreur, objet: Self::table() }.as_err(),
         }
     }
 
-    async fn enregistrer(&self) -> Result<(), Erreur> {
-        if !Self::existe(self.id()).await? {
-            self.inserer().await?;
+    async fn inserer(&self) -> Result<(), Erreur> {
+        let db = obtenir_db().await?;
+        let res = self.inserer_db(&db).await;
+        db.close().await;
+        res
+    }
+
+    async fn enregistrer_db(&self, db: &Pool<Sqlite>) -> Result<(), Erreur> {
+        if !Self::existe_db(self.id(), db).await? {
+            self.inserer_db(db).await?;
         }
         Ok(())
     }
 
-    async fn traduire(&self) -> Result<(), Erreur> {
+    async fn enregistrer(&self) -> Result<(), Erreur> {
+        let db = obtenir_db().await?;
+        let res = self.enregistrer_db(&db).await;
+        db.close().await;
+        res
+    }
+
+    async fn traduire_db(&self, db: &Pool<Sqlite>) -> Result<(), Erreur> {
         match sqlx::query(
             &self.commande_traduire()
-        ).execute(&obtenir_db().await?).await {
+        ).execute(db).await {
             Ok(_) => Ok(()),
             Err(erreur) => ErreurTraductionImpossible { erreur, objet: Self::table() }.as_err(),
         }
+    }
+
+    async fn traduire(&self) -> Result<(), Erreur> {
+        let db = obtenir_db().await?;
+        let res = self.traduire_db(&db).await;
+        db.close().await;
+        res
     }
 }
 
@@ -203,7 +252,7 @@ async fn charger_vec<T: for<'a> CompatibleSQL<'a, u32>>(
     };
     for ligne in res.iter() {
         match ligne.get::<Option<u32>, &str>(champ) {
-            Some(id) => match T::charger(id).await? {
+            Some(id) => match T::charger_db(id, db).await? {
                 Some(valeur) => liste.push(valeur),
                 None => {},
             },
@@ -260,17 +309,17 @@ impl CompatibleSQL<'_, u32> for CollectionIGDB {
         )
     }
 
-    async fn charger(id: u32) -> Result<Option<CollectionIGDB>, Erreur> {
+    async fn charger_db(id: u32, db: &Pool<Sqlite>) -> Result<Option<CollectionIGDB>, Erreur> {
         match sqlx::query_as::<_, CollectionIGDB>(
             &CollectionIGDB::commande_charger(id)
-        ).fetch_optional(&obtenir_db().await?).await {
+        ).fetch_optional(db).await {
             Ok(valeur) => Ok(valeur),
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "collection", id }.as_err(),
         }
     }
 
-    async fn charger_traduit(id: u32) -> Result<Option<CollectionIGDB>, Erreur> {
-        match CollectionIGDB::charger(id).await? {
+    async fn charger_traduit_db(id: u32, db: &Pool<Sqlite>) -> Result<Option<CollectionIGDB>, Erreur> {
+        match CollectionIGDB::charger_db(id, db).await? {
             Some(valeur) => Ok(Some(
                 CollectionIGDB {
                     id,
@@ -329,17 +378,17 @@ impl CompatibleSQL<'_, u32> for FranchiseIGDB {
         )
     }
 
-    async fn charger(id: u32) -> Result<Option<FranchiseIGDB>, Erreur> {
+    async fn charger_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<FranchiseIGDB>, Erreur> {
         match sqlx::query_as::<_, FranchiseIGDB>(
             &FranchiseIGDB::commande_charger(id)
-        ).fetch_optional(&obtenir_db().await?).await {
+        ).fetch_optional(db).await {
             Ok(valeur) => Ok(valeur),
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "franchise", id }.as_err(),
         }
     }
 
-    async fn charger_traduit(id: u32) -> Result<Option<FranchiseIGDB>, Erreur> {
-        match FranchiseIGDB::charger(id).await? {
+    async fn charger_traduit_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<FranchiseIGDB>, Erreur> {
+        match FranchiseIGDB::charger_db(id, db).await? {
             Some(valeur) => Ok(Some(
                 FranchiseIGDB {
                     id,
@@ -384,17 +433,17 @@ impl CompatibleSQL<'_, u32> for CategorieJeuIGDB {
         )
     }
 
-    async fn charger(id: u32) -> Result<Option<CategorieJeuIGDB>, Erreur> {
+    async fn charger_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<CategorieJeuIGDB>, Erreur> {
         match sqlx::query_as::<_, CategorieJeuIGDB>(
             &CategorieJeuIGDB::commande_charger(id)
-        ).fetch_optional(&obtenir_db().await?).await {
+        ).fetch_optional(db).await {
             Ok(valeur) => Ok(valeur),
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "categorie jeu", id }.as_err(),
         }
     }
 
-    async fn charger_traduit(id: u32) -> Result<Option<CategorieJeuIGDB>, Erreur> {
-        match CategorieJeuIGDB::charger(id).await? {
+    async fn charger_traduit_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<CategorieJeuIGDB>, Erreur> {
+        match CategorieJeuIGDB::charger_db(id, db).await? {
             Some(valeur) => Ok(Some(
                 CategorieJeuIGDB {
                     id,
@@ -444,17 +493,17 @@ impl CompatibleSQL<'_, u32> for CouvertureIGDB {
         )
     }
 
-    async fn charger(id: u32) -> Result<Option<CouvertureIGDB>, Erreur> {
+    async fn charger_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<CouvertureIGDB>, Erreur> {
         match sqlx::query_as::<_, CouvertureIGDB>(
             &CouvertureIGDB::commande_charger(id)
-        ).fetch_optional(&obtenir_db().await?).await {
+        ).fetch_optional(db).await {
             Ok(valeur) => Ok(valeur),
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "couverture", id }.as_err(),
         }
     }
 
-    async fn charger_traduit(id: u32) -> Result<Option<CouvertureIGDB>, Erreur> {
-        Ok(CouvertureIGDB::charger(id).await?)
+    async fn charger_traduit_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<CouvertureIGDB>, Erreur> {
+        Ok(CouvertureIGDB::charger_db(id, db).await?)
     }
 }
 
@@ -546,29 +595,28 @@ impl CompatibleSQL<'_, u32> for JeuIGDB {
         )
     }
 
-    async fn charger(id: u32) -> Result<Option<JeuIGDB>, Erreur> {
-        let db = obtenir_db().await?;
+    async fn charger_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<JeuIGDB>, Erreur> {
         let resultat = match sqlx::query(
             &JeuIGDB::commande_charger(id)
-        ).fetch_optional(&db).await {
+        ).fetch_optional(db).await {
             Ok(Some(valeur)) => valeur,
             Ok(None) => return Ok(None),
             Err(erreur) => return ErreurChargementImpossible { erreur, objet: "jeu", id}.as_err(),
         };
 
-        let genres = charger_vec::<GenreIGDB>(&db, id, "jeux_genres", "genre");
-        let themes = charger_vec::<ThemeIGDB>(&db, id, "jeux_themes", "theme");
-        let keywords = charger_vec::<MotCleIGDB>(&db, id, "jeux_mots_cles", "mot_cle");
+        let genres = charger_vec::<GenreIGDB>(db, id, "jeux_genres", "genre");
+        let themes = charger_vec::<ThemeIGDB>(db, id, "jeux_themes", "theme");
+        let keywords = charger_vec::<MotCleIGDB>(db, id, "jeux_mots_cles", "mot_cle");
 
-        let platforms = charger_vec_id::<PlateformeIGDB>(&db, id, "jeux_plateformes", "plateforme");
+        let platforms = charger_vec_id::<PlateformeIGDB>(db, id, "jeux_plateformes", "plateforme");
 
-        let remakes = charger_vec_id::<JeuIGDB>(&db, id, "jeux_remakes", "remake");
-        let remasters = charger_vec_id::<JeuIGDB>(&db, id, "jeux_remasters", "remaster");
-        let similar_games = charger_vec_id::<JeuIGDB>(&db, id, "jeux_similaires", "jeu_similaire");
+        let remakes = charger_vec_id::<JeuIGDB>(db, id, "jeux_remakes", "remake");
+        let remasters = charger_vec_id::<JeuIGDB>(db, id, "jeux_remasters", "remaster");
+        let similar_games = charger_vec_id::<JeuIGDB>(db, id, "jeux_similaires", "jeu_similaire");
 
-        let artworks = charger_vec::<IllustrationIGDB>(&db, id, "jeux_illustrations", "illustration");
-        let screenshots = charger_vec::<CaptureEcranIGDB>(&db, id, "jeux_captures_ecran", "capture_ecran");
-        let videos = charger_vec::<VideoIGDB>(&db, id, "jeux_videos", "video");
+        let artworks = charger_vec::<IllustrationIGDB>(db, id, "jeux_illustrations", "illustration");
+        let screenshots = charger_vec::<CaptureEcranIGDB>(db, id, "jeux_captures_ecran", "capture_ecran");
+        let videos = charger_vec::<VideoIGDB>(db, id, "jeux_videos", "video");
 
         Ok(Some(JeuIGDB {
             id,
@@ -584,11 +632,11 @@ impl CompatibleSQL<'_, u32> for JeuIGDB {
             first_release_date: resultat.get("first_release_date"),
 
             collection: match resultat.get("collection") {
-                Some(id) => CollectionIGDB::charger(id).await?,
+                Some(id) => CollectionIGDB::charger_db(id, db).await?,
                 None => None,
             },
             franchise: match resultat.get("franchise"){
-                Some(id) => FranchiseIGDB::charger(id).await?,
+                Some(id) => FranchiseIGDB::charger_db(id, db).await?,
                 None => None,
             },
             category: resultat.get("category"),
@@ -607,7 +655,7 @@ impl CompatibleSQL<'_, u32> for JeuIGDB {
             rating_count: resultat.get("rating_count"),
 
             cover: match resultat.get("cover") {
-                Some(id) => CouvertureIGDB::charger(id).await?,
+                Some(id) => CouvertureIGDB::charger_db(id, db).await?,
                 None => None,
             },
             artworks: artworks.await?,
@@ -618,8 +666,8 @@ impl CompatibleSQL<'_, u32> for JeuIGDB {
         }))
     }
 
-    async fn charger_traduit(id: u32) -> Result<Option<JeuIGDB>, Erreur> {
-        match JeuIGDB::charger(id).await? {
+    async fn charger_traduit_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<JeuIGDB>, Erreur> {
+        match JeuIGDB::charger_db(id, db).await? {
             Some(valeur) => Ok(Some(
                 JeuIGDB {
                     id,
@@ -665,7 +713,7 @@ impl CompatibleSQL<'_, u32> for JeuIGDB {
         }
     }
 
-    async fn inserer(&self) -> Result<(), Erreur> {
+    async fn inserer_db(&self, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<(), Erreur> {
         async fn supprimer(db: &Pool<Sqlite>, id: u32, table: &str) -> Result<(), Erreur> {
             match sqlx::query(
                 &format!(r#"DELETE FROM {} WHERE "jeu" = {};"#, &table, id)
@@ -696,94 +744,104 @@ impl CompatibleSQL<'_, u32> for JeuIGDB {
         }
 
         if self.franchise.is_some() {
-            self.franchise.clone().unwrap().enregistrer().await?;
+            self.franchise.clone().unwrap().enregistrer_db(db).await?;
         }
         if self.collection.is_some() {
-            self.collection.clone().unwrap().enregistrer().await?;
+            self.collection.clone().unwrap().enregistrer_db(db).await?;
         }
 
         if self.genres.is_some() {
             for genre in self.genres.clone().unwrap() {
-                genre.enregistrer().await?;
+                genre.enregistrer_db(db).await?;
             }
         }
         if self.themes.is_some() {
             for theme in self.themes.clone().unwrap() {
-                theme.enregistrer().await?;
+                theme.enregistrer_db(db).await?;
             }
         }
         if self.keywords.is_some() {
             for mot_cle in self.keywords.clone().unwrap() {
-                mot_cle.enregistrer().await?;
+                mot_cle.enregistrer_db(db).await?;
             }
         }
 
         if self.cover.is_some() {
-            self.cover.clone().unwrap().enregistrer().await?;
+            self.cover.clone().unwrap().enregistrer_db(db).await?;
         }
         if self.artworks.is_some() {
             for artwork in self.artworks.clone().unwrap() {
-                artwork.enregistrer().await?;
+                artwork.enregistrer_db(db).await?;
             }
         }
         if self.screenshots.is_some() {
             for screenshot in self.screenshots.clone().unwrap() {
-                screenshot.enregistrer().await?;
+                screenshot.enregistrer_db(db).await?;
             }
         }
         if self.videos.is_some() {
             for video in self.videos.clone().unwrap() {
-                video.enregistrer().await?;
+                video.enregistrer_db(db).await?;
             }
         }
 
-        let db = obtenir_db().await?;
+        let _ = supprimer(db, self.id, "jeux_genres").await?;
+        let _ = supprimer(db, self.id, "jeux_themes").await?;
+        let _ = supprimer(db, self.id, "jeux_mots_cles").await?;
 
-        let _ = supprimer(&db, self.id, "jeux_genres").await?;
-        let _ = supprimer(&db, self.id, "jeux_themes").await?;
-        let _ = supprimer(&db, self.id, "jeux_mots_cles").await?;
+        let _ = supprimer(db, self.id, "jeux_remakes").await?;
+        let _ = supprimer(db, self.id, "jeux_remasters").await?;
+        let _ = supprimer(db, self.id, "jeux_similaires").await?;
 
-        let _ = supprimer(&db, self.id, "jeux_remakes").await?;
-        let _ = supprimer(&db, self.id, "jeux_remasters").await?;
-        let _ = supprimer(&db, self.id, "jeux_similaires").await?;
+        let _ = supprimer(db, self.id, "jeux_plateformes").await?;
 
-        let _ = supprimer(&db, self.id, "jeux_plateformes").await?;
-
-        let _ = supprimer(&db, self.id, "jeux_illustrations").await?;
-        let _ = supprimer(&db, self.id, "jeux_captures_ecran").await?;
-        let _ = supprimer(&db, self.id, "jeux_videos").await?;
+        let _ = supprimer(db, self.id, "jeux_illustrations").await?;
+        let _ = supprimer(db, self.id, "jeux_captures_ecran").await?;
+        let _ = supprimer(db, self.id, "jeux_videos").await?;
 
         let liste: Vec<u32> = self.genres.clone().unwrap_or(vec![]).iter().map(|x| x.id).collect();
-        let _ = inserer(&db, self.id, liste, "jeux_genres", "genre").await?;
+        let _ = inserer(db, self.id, liste, "jeux_genres", "genre").await?;
 
         let liste: Vec<u32> = self.themes.clone().unwrap_or(vec![]).iter().map(|x| x.id).collect();
-        let _ = inserer(&db, self.id, liste, "jeux_themes", "theme").await?;
+        let _ = inserer(db, self.id, liste, "jeux_themes", "theme").await?;
 
         let liste: Vec<u32> = self.keywords.clone().unwrap_or(vec![]).iter().map(|x| x.id).collect();
-        let _ = inserer(&db, self.id, liste, "jeux_mots_cles", "mot_cle").await?;
+        let _ = inserer(db, self.id, liste, "jeux_mots_cles", "mot_cle").await?;
 
-        let _ = inserer(&db, self.id, self.remakes.clone().unwrap_or(vec![]), "jeux_remakes", "remake").await?;
+        let _ = inserer(db, self.id, self.remakes.clone().unwrap_or(vec![]), "jeux_remakes", "remake").await?;
 
-        let _ = inserer(&db, self.id, self.remasters.clone().unwrap_or(vec![]), "jeux_remasters", "remaster").await?;
+        let _ = inserer(db, self.id, self.remasters.clone().unwrap_or(vec![]), "jeux_remasters", "remaster").await?;
 
-        let _ = inserer(&db, self.id, self.similar_games.clone().unwrap_or(vec![]), "jeux_similaires", "jeu_similaire").await?;
+        let _ = inserer(db, self.id, self.similar_games.clone().unwrap_or(vec![]), "jeux_similaires", "jeu_similaire").await?;
 
-        let _ = inserer(&db, self.id, self.platforms.clone().unwrap_or(vec![]), "jeux_genres", "genre").await?;
+        let _ = inserer(db, self.id, self.platforms.clone().unwrap_or(vec![]), "jeux_genres", "genre").await?;
 
         let liste: Vec<u32> = self.artworks.clone().unwrap_or(vec![]).iter().map(|x| x.id).collect();
-        let _ = inserer(&db, self.id, liste, "jeux_illustrations", "illustration").await?;
+        let _ = inserer(db, self.id, liste, "jeux_illustrations", "illustration").await?;
 
         let liste: Vec<u32> = self.screenshots.clone().unwrap_or(vec![]).iter().map(|x| x.id).collect();
-        let _ = inserer(&db, self.id, liste, "jeux_captures_ecran", "capture_ecran").await?;
+        let _ = inserer(db, self.id, liste, "jeux_captures_ecran", "capture_ecran").await?;
 
         let liste: Vec<u32> = self.videos.clone().unwrap_or(vec![]).iter().map(|x| x.id).collect();
-        let _ = inserer(&db, self.id, liste, "jeux_videos", "video").await?;
+        let _ = inserer(db, self.id, liste, "jeux_videos", "video").await?;
 
         match sqlx::query(
             &self.commande_enregistrer()
-        ).execute(&obtenir_db().await?).await {
+        ).execute(db).await {
             Ok(_) => Ok(()),
             Err(erreur) => ErreurEnregistrementImpossible { erreur, objet: JeuIGDB::table() }.as_err(),
+        }
+    }
+
+    async fn existe_db<'b>(id: u32, db: &Pool<Sqlite>) -> Result<bool, Erreur> {
+        match sqlx::query(
+            &format!(
+                "SELECT COUNT(*) AS count FROM jeux WHERE \"id\" = {};",
+                id.convertir(),
+            )
+        ).fetch_one(db).await {
+            Ok(valeur) => Ok(valeur.get::<u32, _>("count") > 0),
+            Err(erreur) => ErreurChargementImpossible { erreur, objet: "jeux", id }.as_err(),
         }
     }
 }
@@ -831,17 +889,17 @@ impl CompatibleSQL<'_, u32> for GenreIGDB {
         )
     }
 
-    async fn charger(id: u32) -> Result<Option<GenreIGDB>, Erreur> {
+    async fn charger_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<GenreIGDB>, Erreur> {
         match sqlx::query_as::<_, GenreIGDB>(
             &GenreIGDB::commande_charger(id)
-        ).fetch_optional(&obtenir_db().await?).await {
+        ).fetch_optional(db).await {
             Ok(valeur) => Ok(valeur),
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "genre", id }.as_err(),
         }
     }
 
-    async fn charger_traduit(id: u32) -> Result<Option<GenreIGDB>, Erreur> {
-        match GenreIGDB::charger(id).await? {
+    async fn charger_traduit_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<GenreIGDB>, Erreur> {
+        match GenreIGDB::charger_db(id, db).await? {
             Some(valeur) => Ok(Some(
                 GenreIGDB {
                     id,
@@ -900,17 +958,17 @@ impl CompatibleSQL<'_, u32> for ThemeIGDB {
         )
     }
 
-    async fn charger(id: u32) -> Result<Option<ThemeIGDB>, Erreur> {
+    async fn charger_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<ThemeIGDB>, Erreur> {
         match sqlx::query_as::<_, ThemeIGDB>(
             &ThemeIGDB::commande_charger(id)
-        ).fetch_optional(&obtenir_db().await?).await {
+        ).fetch_optional(db).await {
             Ok(valeur) => Ok(valeur),
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "theme", id }.as_err(),
         }
     }
 
-    async fn charger_traduit(id: u32) -> Result<Option<ThemeIGDB>, Erreur> {
-        match ThemeIGDB::charger(id).await? {
+    async fn charger_traduit_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<ThemeIGDB>, Erreur> {
+        match ThemeIGDB::charger_db(id, db).await? {
             Some(valeur) => Ok(Some(
                 ThemeIGDB {
                     id,
@@ -969,17 +1027,17 @@ impl CompatibleSQL<'_, u32> for MotCleIGDB {
         )
     }
 
-    async fn charger(id: u32) -> Result<Option<MotCleIGDB>, Erreur> {
+    async fn charger_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<MotCleIGDB>, Erreur> {
         match sqlx::query_as::<_, MotCleIGDB>(
             &MotCleIGDB::commande_charger(id)
-        ).fetch_optional(&obtenir_db().await?).await {
+        ).fetch_optional(db).await {
             Ok(valeur) => Ok(valeur),
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "mot clé", id }.as_err(),
         }
     }
 
-    async fn charger_traduit(id: u32) -> Result<Option<MotCleIGDB>, Erreur> {
-        match MotCleIGDB::charger(id).await? {
+    async fn charger_traduit_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<MotCleIGDB>, Erreur> {
+        match MotCleIGDB::charger_db(id, db).await? {
             Some(valeur) => Ok(Some(
                 MotCleIGDB {
                     id,
@@ -1032,17 +1090,17 @@ impl CompatibleSQL<'_, u32> for IllustrationIGDB {
         )
     }
 
-    async fn charger(id: u32) -> Result<Option<IllustrationIGDB>, Erreur> {
+    async fn charger_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<IllustrationIGDB>, Erreur> {
         match sqlx::query_as::<_, IllustrationIGDB>(
             &IllustrationIGDB::commande_charger(id)
-        ).fetch_optional(&obtenir_db().await?).await {
+        ).fetch_optional(db).await {
             Ok(valeur) => Ok(valeur),
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "illustration", id }.as_err(),
         }
     }
 
-    async fn charger_traduit(id: u32) -> Result<Option<IllustrationIGDB>, Erreur> {
-        Ok(IllustrationIGDB::charger(id).await?)
+    async fn charger_traduit_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<IllustrationIGDB>, Erreur> {
+        Ok(IllustrationIGDB::charger_db(id, db).await?)
     }
 }
 
@@ -1083,17 +1141,17 @@ impl CompatibleSQL<'_, u32> for CaptureEcranIGDB {
         )
     }
 
-    async fn charger(id: u32) -> Result<Option<CaptureEcranIGDB>, Erreur> {
+    async fn charger_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<CaptureEcranIGDB>, Erreur> {
         match sqlx::query_as::<_, CaptureEcranIGDB>(
             &CaptureEcranIGDB::commande_charger(id)
-        ).fetch_optional(&obtenir_db().await?).await {
+        ).fetch_optional(db).await {
             Ok(valeur) => Ok(valeur),
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "capture d'écran", id }.as_err(),
         }
     }
 
-    async fn charger_traduit(id: u32) -> Result<Option<CaptureEcranIGDB>, Erreur> {
-        Ok(CaptureEcranIGDB::charger(id).await?)
+    async fn charger_traduit_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<CaptureEcranIGDB>, Erreur> {
+        Ok(CaptureEcranIGDB::charger_db(id, db).await?)
     }
 }
 
@@ -1139,17 +1197,17 @@ impl CompatibleSQL<'_, u32> for VideoIGDB {
         )
     }
 
-    async fn charger(id: u32) -> Result<Option<VideoIGDB>, Erreur> {
+    async fn charger_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<VideoIGDB>, Erreur> {
         match sqlx::query_as::<_, VideoIGDB>(
             &VideoIGDB::commande_charger(id)
-        ).fetch_optional(&obtenir_db().await?).await {
+        ).fetch_optional(db).await {
             Ok(valeur) => Ok(valeur),
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "vidéo", id }.as_err(),
         }
     }
 
-    async fn charger_traduit(id: u32) -> Result<Option<VideoIGDB>, Erreur> {
-        match VideoIGDB::charger(id).await? {
+    async fn charger_traduit_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<VideoIGDB>, Erreur> {
+        match VideoIGDB::charger_db(id, db).await? {
             Some(valeur) => Ok(Some(
                 VideoIGDB {
                     id,
@@ -1192,17 +1250,17 @@ impl CompatibleSQL<'_, u32> for CategoriePlateformeIGDB {
         )
     }
 
-    async fn charger(id: u32) -> Result<Option<CategoriePlateformeIGDB>, Erreur> {
+    async fn charger_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<CategoriePlateformeIGDB>, Erreur> {
         match sqlx::query_as::<_, CategoriePlateformeIGDB>(
             &CategoriePlateformeIGDB::commande_charger(id)
-        ).fetch_optional(&obtenir_db().await?).await {
+        ).fetch_optional(db).await {
             Ok(valeur) => Ok(valeur),
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "catégorie plateforme", id }.as_err(),
         }
     }
 
-    async fn charger_traduit(id: u32) -> Result<Option<CategoriePlateformeIGDB>, Erreur> {
-        match CategoriePlateformeIGDB::charger(id).await? {
+    async fn charger_traduit_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<CategoriePlateformeIGDB>, Erreur> {
+        match CategoriePlateformeIGDB::charger_db(id, db).await? {
             Some(valeur) => Ok(Some(
                 CategoriePlateformeIGDB {
                     id,
@@ -1252,17 +1310,17 @@ impl CompatibleSQL<'_, u32> for LogoPlateformeIGDB {
         )
     }
 
-    async fn charger(id: u32) -> Result<Option<LogoPlateformeIGDB>, Erreur> {
+    async fn charger_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<LogoPlateformeIGDB>, Erreur> {
         match sqlx::query_as::<_, LogoPlateformeIGDB>(
             &LogoPlateformeIGDB::commande_charger(id)
-        ).fetch_optional(&obtenir_db().await?).await {
+        ).fetch_optional(db).await {
             Ok(valeur) => Ok(valeur),
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "logo plateforme", id }.as_err(),
         }
     }
 
-    async fn charger_traduit(id: u32) -> Result<Option<LogoPlateformeIGDB>, Erreur> {
-        Ok(LogoPlateformeIGDB::charger(id).await?)
+    async fn charger_traduit_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<LogoPlateformeIGDB>, Erreur> {
+        Ok(LogoPlateformeIGDB::charger_db(id, db).await?)
     }
 }
 
@@ -1334,11 +1392,10 @@ impl CompatibleSQL<'_, u32> for PlateformeIGDB {
         )
     }
 
-    async fn charger(id: u32) -> Result<Option<PlateformeIGDB>, Erreur> {
-        let db = obtenir_db().await?;
+    async fn charger_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<PlateformeIGDB>, Erreur> {
         let resultat = match sqlx::query(
             &PlateformeIGDB::commande_charger(id)
-        ).fetch_optional(&db).await {
+        ).fetch_optional(db).await {
             Ok(Some(valeur)) => valeur,
             Ok(None) => return Ok(None),
             Err(erreur) => return ErreurChargementImpossible { erreur, objet: "plateforme", id}.as_err(),
@@ -1356,7 +1413,7 @@ impl CompatibleSQL<'_, u32> for PlateformeIGDB {
             category: resultat.get("category"),
 
             platform_logo: match resultat.get("platform_logo") {
-                Some(id) => LogoPlateformeIGDB::charger(id).await?,
+                Some(id) => LogoPlateformeIGDB::charger_db(id, db).await?,
                 None => None,
             },
 
@@ -1364,8 +1421,8 @@ impl CompatibleSQL<'_, u32> for PlateformeIGDB {
         }))
     }
 
-    async fn charger_traduit(id: u32) -> Result<Option<PlateformeIGDB>, Erreur> {
-        match PlateformeIGDB::charger(id).await? {
+    async fn charger_traduit_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<PlateformeIGDB>, Erreur> {
+        match PlateformeIGDB::charger_db(id, db).await? {
             Some(valeur) => Ok(Some(
                 PlateformeIGDB {
                     id,
@@ -1425,17 +1482,17 @@ impl CompatibleSQL<'_, u32> for LogoEntrepriseIGDB {
         )
     }
 
-    async fn charger(id: u32) -> Result<Option<LogoEntrepriseIGDB>, Erreur> {
+    async fn charger_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<LogoEntrepriseIGDB>, Erreur> {
         match sqlx::query_as::<_, LogoEntrepriseIGDB>(
             &LogoEntrepriseIGDB::commande_charger(id)
-        ).fetch_optional(&obtenir_db().await?).await {
+        ).fetch_optional(db).await {
             Ok(valeur) => Ok(valeur),
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "logo entreprise", id }.as_err(),
         }
     }
 
-    async fn charger_traduit(id: u32) -> Result<Option<LogoEntrepriseIGDB>, Erreur> {
-        Ok(LogoEntrepriseIGDB::charger(id).await?)
+    async fn charger_traduit_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<LogoEntrepriseIGDB>, Erreur> {
+        Ok(LogoEntrepriseIGDB::charger_db(id, db).await?)
     }
 }
 
@@ -1511,11 +1568,10 @@ impl CompatibleSQL<'_, u32> for EntrepriseIGDB {
         )
     }
 
-    async fn charger(id: u32) -> Result<Option<EntrepriseIGDB>, Erreur> {
-        let db = obtenir_db().await?;
+    async fn charger_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<EntrepriseIGDB>, Erreur> {
         let resultat = match sqlx::query(
             &EntrepriseIGDB::commande_charger(id)
-        ).fetch_optional(&db).await {
+        ).fetch_optional(db).await {
             Ok(Some(valeur)) => valeur,
             Ok(None) => return Ok(None),
             Err(erreur) => return ErreurChargementImpossible { erreur, objet: "entreprise", id}.as_err(),
@@ -1525,7 +1581,7 @@ impl CompatibleSQL<'_, u32> for EntrepriseIGDB {
         let mut published: Vec<u32> = vec![];
         let res = match sqlx::query(
             &format!("SELECT * FROM jeux_entreprises WHERE \"entreprise\" = {};", id)
-        ).fetch_all(&db).await {
+        ).fetch_all(db).await {
             Ok(valeur) => valeur,
             Err(erreur) => return ErreurChargementImpossible { erreur, objet: "jeux_entreprises", id }.as_err(),
         };
@@ -1560,7 +1616,7 @@ impl CompatibleSQL<'_, u32> for EntrepriseIGDB {
             parent: resultat.get("parent"),
 
             logo: match resultat.get("logo") {
-                Some(id) => LogoEntrepriseIGDB::charger(id).await?,
+                Some(id) => LogoEntrepriseIGDB::charger_db(id, db).await?,
                 None => None,
             },
 
@@ -1570,8 +1626,8 @@ impl CompatibleSQL<'_, u32> for EntrepriseIGDB {
         }))
     }
 
-    async fn charger_traduit(id: u32) -> Result<Option<EntrepriseIGDB>, Erreur> {
-        match EntrepriseIGDB::charger(id).await? {
+    async fn charger_traduit_db(id: u32, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<EntrepriseIGDB>, Erreur> {
+        match EntrepriseIGDB::charger_db(id, db).await? {
             Some(valeur) => Ok(Some(
                 EntrepriseIGDB {
                     id,
@@ -1598,12 +1654,10 @@ impl CompatibleSQL<'_, u32> for EntrepriseIGDB {
         }
     }
 
-    async fn inserer(&self) -> Result<(), Erreur> {
-        let db = obtenir_db().await?;
-
+    async fn inserer_db(&self, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<(), Erreur> {
         match sqlx::query(
             &format!(r#"DELETE * FROM jeux_entreprises WHERE "entreprise" = {};"#, self.id)
-        ).execute(&db).await {
+        ).execute(db).await {
             Ok(_) => {},
             Err(erreur) => return ErreurSQL { erreur, desc: "la suppression d'un jeu dans jeux_entreprises"}.as_err(),
         }
@@ -1630,12 +1684,12 @@ impl CompatibleSQL<'_, u32> for EntrepriseIGDB {
             Ok(())
         }
 
-        let published = inserer(&db, self.id, self.published.clone().unwrap_or(vec![]), false, true);
+        let published = inserer(db, self.id, self.published.clone().unwrap_or(vec![]), false, true);
 
-        let developed = inserer(&db, self.id, self.developed.clone().unwrap_or(vec![]), true, false);
+        let developed = inserer(db, self.id, self.developed.clone().unwrap_or(vec![]), true, false);
 
         //FIXME: copy past from top; this makes an infinite loop
-        CompatibleSQL::enregistrer(self).await?;
+        CompatibleSQL::enregistrer_db(self, db).await?;
 
         published.await?;
         developed.await?;
@@ -1675,16 +1729,28 @@ impl CompatibleSQL<'_, String> for Jeu {
         format!("SELECT * FROM catalogue WHERE \"chemin\" = {};", id.convertir())
     }
 
-    async fn charger(id: String) -> Result<Option<Jeu>, Erreur> {
+    async fn charger_db(id: String, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<Jeu>, Erreur> {
         match sqlx::query_as::<_, Jeu>(
             &Jeu::commande_charger(id)
-        ).fetch_optional(&obtenir_db().await?).await {
+        ).fetch_optional(db).await {
             Ok(valeur) => Ok(valeur),
             Err(erreur) => ErreurChargementImpossible { erreur, objet: "jeu du catalogue", id: 0 }.as_err(),
         }
     }
 
-    async fn charger_traduit(id: String) -> Result<Option<Jeu>, Erreur> {
-        Jeu::charger(id).await
+    async fn charger_traduit_db(id: String, db: &sqlx::Pool<sqlx::Sqlite>) -> Result<Option<Jeu>, Erreur> {
+        Jeu::charger_db(id, db).await
+    }
+
+    async fn existe_db<'b>(id: String, db: &Pool<Sqlite>) -> Result<bool, Erreur> {
+        match sqlx::query(
+            &format!(
+                "SELECT COUNT(*) AS count FROM catalogue WHERE \"chemin\" = {};",
+                id.convertir(),
+            )
+        ).fetch_one(db).await {
+            Ok(valeur) => Ok(valeur.get::<u32, _>("count") > 0),
+            Err(erreur) => ErreurChargementImpossible { erreur, objet: "catalogue", id: 0 }.as_err(),
+        }
     }
 }
