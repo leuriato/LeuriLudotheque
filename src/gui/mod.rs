@@ -24,16 +24,11 @@ pub fn construire_ui(application: &Application) {
         .hscrollbar_policy(gtk::PolicyType::Never)
         .build();
 
-    deroulante.connect_scroll_child( |c, h, w| {
-        println!("{}\t{}", h, w);
-        true
-    });
-
     let fenetre = ApplicationWindow::builder()
         .application(application)
         .title("LeuriLudothèque")
-        .width_request(1280)
-        .height_request(720)
+        .width_request(900)
+        .height_request(520)
         .child(&deroulante)
         .build();
 
@@ -44,25 +39,20 @@ pub fn construire_ui(application: &Application) {
 
     let categorie1 = construire_categorie(
         "Pokémon",
-        obtenir_jeux_par("name LIKE '%Pok_mon%' ORDER BY rating DESC"),
-        &deroulante,
+        //obtenir_jeux_par("name LIKE '%Pok_mon%' ORDER BY rating DESC"),
     );
     let categorie2 = construire_categorie(
         "The Legend of Zelda",
-        obtenir_jeux_par("collection = 106 ORDER BY rating DESC"),
-        &deroulante,
+        //obtenir_jeux_par("collection = 106 ORDER BY rating DESC"),
     );
     let categorie3 = construire_categorie(
         "Professeur Layton",
-        obtenir_jeux_par("collection = 297 ORDER BY rating DESC"),
-        &deroulante,
+        //obtenir_jeux_par("collection = 297 ORDER BY rating DESC"),
     );
 
     boite.prepend(&categorie3);
     boite.prepend(&categorie2);
     boite.prepend(&categorie1);
-
-    deroulante.set_vscrollbar_policy(gtk::PolicyType::Automatic);
 
     fenetre.present();
 }

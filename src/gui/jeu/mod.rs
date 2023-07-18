@@ -1,4 +1,8 @@
+pub mod collection;
+pub mod miniature;
+
 use std::process::Command;
+use std::sync::Arc;
 
 use gtk::prelude::*;
 use gtk::{Box, Image, Label, ScrolledWindow};
@@ -7,6 +11,7 @@ use gtk::Adjustment;
 use crate::chemin::chemins;
 use crate::donnees::config::obtenir_config;
 use crate::donnees::objet::Jeu;
+use crate::gui::jeu::miniature::Miniature;
 
 fn obtenir_commande(chemin: String) -> String {
     let config = obtenir_config();
@@ -36,26 +41,31 @@ fn creer_commande(chemin: String) -> String {
 fn construire_miniature(jeu: Jeu) -> gtk::Widget {
     let miniature = Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .width_request(264)
+        .width_request(200)
         .height_request(300)
+        .spacing(5)
         .margin_top(0)
-        .margin_bottom(0)
+        .margin_bottom(10)
         .margin_start(0)
         .margin_end(0)
+        .halign(gtk::Align::Start)
+        .hexpand(false)
+        .valign(gtk::Align::Start)
+        .vexpand(false)
         .build();
 
-    let image = Image::builder()
-        //.width_request(264)
-        //.height_request(352)
-        .vexpand(true)
-        .hexpand(true)
-        .file(
+    let image = gtk::Picture::for_filename(
             chemins::trouver_chemin(
                 format!("{}.jpg", jeu.jeu.unwrap_or(0)),
                 chemins::XDG::CACHE,
             ).unwrap().as_path().as_os_str().to_str().unwrap_or("")
-        )
-        .build();
+        );
+    image.set_can_shrink(true);
+    image.set_content_fit(gtk::ContentFit::Cover);
+    image.set_halign(gtk::Align::Start);
+    image.set_hexpand(false);
+    image.set_valign(gtk::Align::Start);
+    image.set_vexpand(false);
 
     let titre = Label::builder()
         .label(
@@ -67,7 +77,10 @@ fn construire_miniature(jeu: Jeu) -> gtk::Widget {
         )
         .wrap(true)
         .wrap_mode(gtk::pango::WrapMode::Word)
-        .hexpand(true)
+        .halign(gtk::Align::Center)
+        .hexpand(false)
+        .valign(gtk::Align::Start)
+        .vexpand(false)
         .lines(2)
         .justify(gtk::Justification::Center)
         .build();
@@ -91,18 +104,30 @@ fn construire_miniature(jeu: Jeu) -> gtk::Widget {
     miniature.upcast()
 }
 
-pub fn construire_categorie(nom: &str, jeux: Vec<Jeu>, parent: &ScrolledWindow) -> gtk::Widget {
+pub fn construire_categorie(nom: &str, /*jeux: Vec<Jeu>*/) -> gtk::Widget {
     let categorie = Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .margin_top(0)
-        .margin_bottom(0)
+        .margin_top(10)
+        .margin_bottom(20)
         .margin_start(0)
         .margin_end(0)
+        .spacing(5)
+        .halign(gtk::Align::Fill)
+        .hexpand(true)
+        .valign(gtk::Align::Start)
+        .vexpand(false)
         .build();
 
     let titre = Label::builder()
         .label(format!("<span font=\"24\">{nom}</span>"))
-        .hexpand(true)
+        .margin_top(0)
+        .margin_bottom(0)
+        .margin_start(20)
+        .margin_end(0)
+        .halign(gtk::Align::Start)
+        .hexpand(false)
+        .valign(gtk::Align::Center)
+        .vexpand(false)
         .justify(gtk::Justification::Left)
         .use_markup(true)
         .build();
@@ -110,17 +135,32 @@ pub fn construire_categorie(nom: &str, jeux: Vec<Jeu>, parent: &ScrolledWindow) 
     let fenetre = ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::Automatic)
         .vscrollbar_policy(gtk::PolicyType::Never)
-        .vadjustment(&parent.vadjustment())
+        .halign(gtk::Align::Fill)
+        .hexpand(true)
+        .valign(gtk::Align::Start)
+        .vexpand(false)
         .build();
 
     let boite = Box::builder()
         .orientation(gtk::Orientation::Horizontal)
+        .margin_top(0)
+        .margin_bottom(0)
+        .margin_start(20)
+        .margin_end(20)
+        .spacing(20)
         .build();
-
+    /*
     for i in 1..=jeux.len() {
         let miniature = construire_miniature(jeux[jeux.len()-i].clone());
         boite.prepend(&miniature);
     }
+    */
+
+    for _ in 0..10 {
+        //let miniature = Miniature::with_jeu(Jeu { jeu: Some(0), chemin: String::new(), nom: "test".to_string(), langue: String::new() });
+        boite.append(&Miniature::modele());
+    }
+
     fenetre.set_child(Some(&boite));
 
     categorie.prepend(&fenetre);
